@@ -37,11 +37,19 @@ let hoverTile = null;
  * 에셋 (파일명 고정)
  ***********************/
 const TILE_ASSETS = {
-  road_WDL: "assets/tiles/road_WDL.png",
-  road_WL: "assets/tiles/road_WL.png",
-  road_YL: "assets/tiles/road_YL.png",
-  sidewalk: "assets/tiles/road-sidewalk.png",
-  bush: "assets/tiles/bush.png"
+  road_WDL: { src: "assets/tiles/road_WDL.png", w: 64, h: 32 },
+  road_WL: { src: "assets/tiles/road_WL.png", w: 64, h: 32},
+  road_YL: { src: "assets/tiles/road_YL.png", w: 64, h: 32},
+  sidewalk: { src: "assets/tiles/road-sidewalk.png", w: 64, h: 32},
+  bush: { src: "assets/tiles/bush.png", w: 64, h: 32},
+  road_WDL_curved: { src: "assets/tiles/road_WDL_curved.png", w: 64, h: 32 },
+  road_WL_curved: { src: "assets/tiles/road_WL_curved.png", w: 64, h: 32 },
+  road_YL_curved: { src: "assets/tiles/road_YL_curved.png", w: 64, h: 32 },
+  road_bush: { src: "assets/tiles/road-bush.png", w: 64, h: 32 },
+  road_sidewalk_curved: { src: "assets/tiles/road-sidewalk_curved.png", w: 64, h: 32 },
+  road_sidewalk_edge: { src: "assets/tiles/road-sidewalk_edge.png", w: 64, h: 32 },
+  road_bush_curved: { src: "assets/tiles/road-bush_curved.png", w: 64, h: 32 },
+  road_bush_edge: { src: "assets/tiles/road-bush_edge.png", w: 64, h: 32 }
 };
 
 const BUILDING_ASSETS = {
