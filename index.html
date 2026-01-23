@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>Isometric City Builder</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ===== 좌측 UI ===== -->
+  <div id="ui">
+
+    <!-- 상위 카테고리 -->
+    <button class="category-btn" onclick="toggleCategory('tile')">타일</button>
+    <div id="tile" class="subcategory">
+      <img src="assets/tiles/road_WDL.png" onclick="selectTile('road_WDL', this)" />
+      <img src="assets/tiles/road_WL.png" onclick="selectTile('road_WL', this)" />
+      <img src="assets/tiles/road_YL.png" onclick="selectTile('road_YL', this)" />
+      <img src="assets/tiles/road-sidewalk.png" onclick="selectTile('sidewalk', this)" />
+      <img src="assets/tiles/bush.png" onclick="selectTile('bush', this)" />
+    </div>
+
+    <button class="category-btn" onclick="toggleCategory('housing')">주택</button>
+    <div id="housing" class="subcategory">
+      <img src="assets/buildings/house.png" onclick="selectBuilding('house', this)" />
+      <img src="assets/buildings/apartment.png" onclick="selectBuilding('apartment', this)" />
+    </div>
+
+    <button class="category-btn" onclick="toggleCategory('commercial')">상가</button>
+    <div id="commercial" class="subcategory"></div>
+
+    <button class="category-btn" onclick="toggleCategory('public')">관공서</button>
+    <div id="public" class="subcategory"></div>
+
+    <button class="category-btn" onclick="toggleCategory('industry')">산업시설</button>
+    <div id="industry" class="subcategory"></div>
+
+    <button class="category-btn" onclick="toggleCategory('etc')">기타</button>
+    <div id="etc" class="subcategory"></div>
+
+    <!-- 지우개 (독립 버튼) -->
+    <button class="eraser-btn" onclick="selectEraser()">지우개</button>
+
+    <!-- 하단 버튼 -->
+    <div id="bottom-buttons">
+      <button title="저장" onclick="saveCity()">💾</button>
+      <button title="불러오기" onclick="loadCity()">📂</button>
+      <button title="캡쳐" onclick="captureCity()">📸</button>
+    </div>
+
+  </div>
+
+  <!-- ===== 캔버스 ===== -->
+  <canvas id="gameCanvas"></canvas>
+
+  <!-- JS -->
+  <script src="main.js"></script>
+</body>
+</html>
