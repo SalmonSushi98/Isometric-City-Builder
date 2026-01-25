@@ -51,7 +51,8 @@ body {
   height: 90px;
   object-fit: contain;
   background: #fff;
-  border: 1px solid #bbb;
+  border: 2px solid #bbb;
+  box-sizing: border-box;
   cursor: pointer;
 }
 
@@ -59,9 +60,8 @@ body {
   border-color: #333;
 }
 
-.selected-item {
-  outline: 3px solid #4caf50;
-  outline-offset: -3px;
+.subcategory img.selected {
+  border-color: #4caf50;
 }
 
 /* ===== 지우개 버튼 ===== */

@@ -1,112 +1,106 @@
-/***********************
- * 기본 설정
- ***********************/
+/*************************
+ * 캔버스 & 기본 설정
+ *************************/
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
+const UI_WIDTH = 220;
 
 const TILE_W = 64;
 const TILE_H = 32;
+
 const MAP_W = 20;
 const MAP_H = 20;
 
-/* 🔹 맵 중심을 화면 중앙에 맞춤 */
-const MAP_CENTER_X = (MAP_W - 1) / 2;
-const MAP_CENTER_Y = (MAP_H - 1) / 2;
+/*************************
+ * 캔버스 리사이즈 & 중앙 정렬
+ *************************/
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.addEventListener("resize", resizeCanvas);
+resizeCanvas();
 
-const CENTER = isoToScreenRaw(MAP_CENTER_X, MAP_CENTER_Y);
-const ORIGIN_X = canvas.width / 2 - CENTER.x + TILE_W / 2;
-const ORIGIN_Y = canvas.height / 2 - CENTER.y + 50;
-
-/***********************
+/*************************
  * 상태
- ***********************/
-let selectedItem = null;
-let selectedType = null;
-let selectedUI = null;
+ *************************/
+let currentItem = null;
+let eraseMode = false;
+let openedCategory = null;
+let hoverIso = null;
 
-const map = Array.from({ length: MAP_H }, () =>
-  Array.from({ length: MAP_W }, () => null)
-);
+// "x,y" → { img, w, h }
+const mapData = {};
 
-let hoverTile = null;
-
-/***********************
- * 에셋 (파일명 고정)
- ***********************/
-const TILE_ASSETS = {
-  road_WDL: "assets/tiles/road_WDL.png",
-  road_WL: "assets/tiles/road_WL.png",
-  road_YL: "assets/tiles/road_YL.png",
-  sidewalk: "assets/tiles/road-sidewalk.png",
-  bush: "assets/tiles/bush.png",
-  road_WDL_curved: "assets/tiles/road_WDL_curved.png",
-  road_WL_curved: "assets/tiles/road_WL_curved.png",
-  road_YL_curved: "assets/tiles/road_YL_curved.png",
-  road_bush: "assets/tiles/road-bush.png",
-  road_sidewalk_curved: "assets/tiles/road-sidewalk_curved.png",
-  road_sidewalk_edge: "assets/tiles/road-sidewalk_edge.png",
-  road_bush_curved: "assets/tiles/road-bush_curved.png",
-  road_bush_edge: "assets/tiles/road-bush_edge.png",
+/*************************
+ * 아이템 정의
+ *************************/
+const ITEMS = {
+  tile: [
+    { id: "road_WDL", type: "tile", w: 64, h: 32 },
+    { id: "road_WL", type: "tile", w: 64, h: 32 },
+    { id: "road_YL", type: "tile", w: 64, h: 32 },
+    { id: "road-sidewalk", type: "tile", w: 64, h: 32 },
+    { id: "bush", type: "tile", w: 64, h: 32 },
+    { id: "road_WDL_curved", type: "tile", w: 64, h: 32 },
+    { id: "road_WL_curved", type: "tile", w: 64, h: 32 },
+    { id: "road_YL_curved", type: "tile", w: 64, h: 32 },
+    { id: "road-bush", type: "tile", w: 64, h: 32 },
+    { id: "road-sidewalk_curved", type: "tile", w: 64, h: 32 },
+    { id: "road-sidewalk_edge", type: "tile", w: 64, h: 32 },
+    { id: "road-bush_curved", type: "tile", w: 64, h: 32 },
+    { id: "road-bush_edge", type: "tile", w: 64, h: 32 }
+  ],
+  housing: [
+    { id: "house", type: "building", w: 64, h: 64 },
+    { id: "apartment", type: "building", w: 64, h: 128 }
+  ],
+  commercial: [],
+  public: [],
+  industry: [],
+  etc: []
 };
 
-const BUILDING_ASSETS = {
-  house: { src: "assets/buildings/house.png", w: 64, h: 64 },
-  apartment: { src: "assets/buildings/apartment.png", w: 64, h: 128 }
-};
-
-const images = {};
-[...Object.values(TILE_ASSETS),
- ...Object.values(BUILDING_ASSETS).map(b => b.src)
-].forEach(src => {
-  const img = new Image();
-  img.crossOrigin = "anonymous";
-  img.src = src;
-  images[src] = img;
-});
-
-/***********************
- * 좌표 변환
- ***********************/
-function isoToScreenRaw(x, y) {
+/*************************
+ * 좌표 변환 (아이소메트릭)
+ *************************/
+function getIsoOrigin() {
+  const gridPixelHeight = (MAP_W + MAP_H) * (TILE_H / 2);
   return {
-    x: (x - y) * TILE_W / 2,
-    y: (x + y) * TILE_H / 2
+    x: UI_WIDTH + (canvas.width - UI_WIDTH) / 2,
+    y: (canvas.height - gridPixelHeight) / 2
   };
 }
 
 function isoToScreen(x, y) {
-  const p = isoToScreenRaw(x, y);
+  const o = getIsoOrigin();
   return {
-    x: p.x + ORIGIN_X,
-    y: p.y + ORIGIN_Y
+    x: o.x + (x - y) * (TILE_W / 2),
+    y: o.y + (x + y) * (TILE_H / 2)
   };
 }
 
-function screenToIso(mx, my) {
-  mx -= ORIGIN_X;
-  my -= ORIGIN_Y;
+function screenToIso(px, py) {
+  const o = getIsoOrigin();
+  px -= o.x;
+  py -= o.y;
 
-  return {
-    x: Math.floor((mx / (TILE_W / 2) + my / (TILE_H / 2)) / 2),
-    y: Math.floor((my / (TILE_H / 2) - mx / (TILE_W / 2)) / 2)
-  };
+  const x = Math.floor((px / (TILE_W / 2) + py / (TILE_H / 2)) / 2);
+  const y = Math.floor((py / (TILE_H / 2) - px / (TILE_W / 2)) / 2);
+  return { x, y };
 }
 
-function inMap(x, y) {
-  return x >= 0 && y >= 0 && x < MAP_W && y < MAP_H;
-}
-
-/***********************
+/*************************
  * 렌더링
- ***********************/
+ *************************/
 function drawGrid() {
   ctx.strokeStyle = "#ddd";
+
   for (let y = 0; y < MAP_H; y++) {
     for (let x = 0; x < MAP_W; x++) {
       const p = isoToScreen(x, y);
+
       ctx.beginPath();
       ctx.moveTo(p.x, p.y);
       ctx.lineTo(p.x + TILE_W / 2, p.y + TILE_H / 2);
@@ -118,43 +112,55 @@ function drawGrid() {
   }
 }
 
-function drawMap() {
-  for (let y = 0; y < MAP_H; y++) {
-    for (let x = 0; x < MAP_W; x++) {
-      const cell = map[y][x];
-      if (!cell) continue;
+function drawTiles() {
+  const sorted = Object.entries(mapData)
+    .map(([key, tile]) => {
+      const [x, y] = key.split(",").map(Number);
+      return { x, y, tile };
+    })
+    .sort((a, b) => (a.x + a.y) - (b.x + b.y)); // ⭐ 핵심
 
-      const p = isoToScreen(x, y);
-      const img = images[cell.src];
+  sorted.forEach(({ x, y, tile }) => {
+    const p = isoToScreen(x, y);
 
-      if (cell.type === "tile") {
-        ctx.drawImage(img, p.x - TILE_W / 2, p.y, TILE_W, TILE_H);
-      } else {
-        ctx.drawImage(
-          img,
-          p.x - cell.w / 2,
-          p.y - cell.h + TILE_H,
-          cell.w,
-          cell.h
-        );
-      }
-    }
-  }
+    ctx.drawImage(
+      tile.img,
+      p.x - tile.w / 2,
+      p.y + TILE_H - tile.h,
+      tile.w,
+      tile.h
+    );
+  });
 }
 
 function drawPreview() {
-  if (!hoverTile || !inMap(hoverTile.x, hoverTile.y)) return;
+  if (!hoverIso) return;
 
-  const { x, y } = hoverTile;
+  const { x, y } = hoverIso;
+  const key = `${x},${y}`;
   const p = isoToScreen(x, y);
-  const occupied = map[y][x] !== null;
+  const occupied = !!mapData[key];
 
-  ctx.fillStyle =
-    selectedType === "eraser"
-      ? "rgba(255,0,0,0.35)"
-      : occupied
-      ? "rgba(255,0,0,0.35)"
-      : "rgba(0,255,0,0.35)";
+  // 지우개
+  if (eraseMode) {
+    if (!occupied) return;
+
+    ctx.fillStyle = "rgba(255,0,0,0.35)";
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+    ctx.lineTo(p.x + TILE_W / 2, p.y + TILE_H / 2);
+    ctx.lineTo(p.x, p.y + TILE_H);
+    ctx.lineTo(p.x - TILE_W / 2, p.y + TILE_H / 2);
+    ctx.closePath();
+    ctx.fill();
+    return;
+  }
+
+  if (!currentItem) return;
+
+  ctx.fillStyle = occupied
+    ? "rgba(255,0,0,0.35)"
+    : "rgba(0,200,0,0.30)";
 
   ctx.beginPath();
   ctx.moveTo(p.x, p.y);
@@ -164,101 +170,110 @@ function drawPreview() {
   ctx.closePath();
   ctx.fill();
 
-  if (occupied || selectedType === "eraser" || !selectedItem) return;
-
-  const img = images[selectedItem.src];
-  ctx.globalAlpha = 0.7;
-
-  if (selectedType === "tile") {
-    ctx.drawImage(img, p.x - TILE_W / 2, p.y, TILE_W, TILE_H);
-  } else {
+  if (!occupied) {
+    ctx.globalAlpha = 0.7;
     ctx.drawImage(
-      img,
-      p.x - selectedItem.w / 2,
-      p.y - selectedItem.h + TILE_H,
-      selectedItem.w,
-      selectedItem.h
+      currentItem.img,
+      p.x - currentItem.w / 2,
+      p.y + TILE_H - currentItem.h,
+      currentItem.w,
+      currentItem.h
     );
+    ctx.globalAlpha = 1;
   }
-
-  ctx.globalAlpha = 1;
 }
 
-/***********************
- * 루프
- ***********************/
 function render() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   drawGrid();
-  drawMap();
+  drawTiles();
   drawPreview();
   requestAnimationFrame(render);
 }
 render();
 
-/***********************
- * 마우스
- ***********************/
+/*************************
+ * 마우스 인터랙션
+ *************************/
 canvas.addEventListener("mousemove", e => {
-  hoverTile = screenToIso(e.offsetX, e.offsetY);
+  const iso = screenToIso(e.offsetX, e.offsetY);
+  if (iso.x < 0 || iso.y < 0 || iso.x >= MAP_W || iso.y >= MAP_H) {
+    hoverIso = null;
+    return;
+  }
+  hoverIso = iso;
 });
 
-canvas.addEventListener("click", () => {
-  if (!hoverTile || !inMap(hoverTile.x, hoverTile.y)) return;
+canvas.addEventListener("click", e => {
+  if (!hoverIso) return;
+  const { x, y } = hoverIso;
+  const key = `${x},${y}`;
 
-  const { x, y } = hoverTile;
-
-  if (selectedType === "eraser") {
-    map[y][x] = null;
+  if (eraseMode) {
+    delete mapData[key];
     return;
   }
 
-  if (!selectedItem || map[y][x]) return;
-  map[y][x] = { ...selectedItem, type: selectedType };
+  if (!currentItem || mapData[key]) return;
+
+  mapData[key] = {
+    img: currentItem.img,
+    w: currentItem.w,
+    h: currentItem.h
+  };
 });
 
-/***********************
- * UI 선택
- ***********************/
-function setUISelected(el) {
-  if (selectedUI) selectedUI.classList.remove("selected-item");
-  selectedUI = el;
-  if (el) el.classList.add("selected-item");
-}
+/*************************
+ * UI 제어
+ *************************/
+window.toggleCategory = function (cat) {
+  if (openedCategory === cat) {
+    document.getElementById(cat).style.display = "none";
+    openedCategory = null;
+    return;
+  }
 
-window.selectTile = (key, el) => {
-  selectedType = "tile";
-  selectedItem = { src: TILE_ASSETS[key] };
-  setUISelected(el);
+  document.querySelectorAll(".subcategory")
+    .forEach(el => el.style.display = "none");
+
+  const target = document.getElementById(cat);
+  if (!target) return;
+
+  target.style.display = "grid";
+  openedCategory = cat;
 };
 
-window.selectBuilding = (key, el) => {
-  selectedType = "building";
-  selectedItem = BUILDING_ASSETS[key];
-  setUISelected(el);
+window.selectItem = function (cat, idx, el) {
+  eraseMode = false;
+  const item = ITEMS[cat][idx];
+
+  if (!item.img) {
+    const img = new Image();
+    img.src =
+      item.type === "tile"
+        ? `assets/tiles/${item.id}.png`
+        : `assets/buildings/${item.id}.png`;
+    item.img = img;
+  }
+
+  currentItem = item;
+
+  document.querySelectorAll(".subcategory img")
+    .forEach(i => i.classList.remove("selected"));
+  el.classList.add("selected");
 };
 
-window.selectEraser = () => {
-  selectedType = "eraser";
-  selectedItem = null;
-  if (selectedUI) selectedUI.classList.remove("selected-item");
-  selectedUI = null;
+window.selectEraser = function () {
+  eraseMode = true;
+  currentItem = null;
+  document.querySelectorAll(".subcategory img")
+    .forEach(i => i.classList.remove("selected"));
 };
 
-/***********************
- * 카테고리 토글
- ***********************/
-window.toggleCategory = function (id) {
-  document.querySelectorAll(".subcategory").forEach(el => {
-    el.style.display =
-      el.id === id && el.style.display !== "grid" ? "grid" : "none";
-  });
-};
-
-/***********************
+/*************************
  * 저장 / 불러오기 / 캡쳐
- ***********************/
-window.saveCity = () => {
+ *************************/
+window.saveCity = function () {
   const name = prompt("도시 이름을 입력하세요");
   if (!name) return;
 
@@ -267,40 +282,38 @@ window.saveCity = () => {
     return;
   }
 
-  localStorage.setItem("city_" + name, JSON.stringify(map));
-  alert("저장 완료!");
+  const data = {};
+  Object.entries(mapData).forEach(([k, v]) => {
+    data[k] = { src: v.img.src, w: v.w, h: v.h };
+  });
+
+  localStorage.setItem("city_" + name, JSON.stringify(data));
 };
 
-window.loadCity = () => {
+window.loadCity = function () {
   const keys = Object.keys(localStorage)
     .filter(k => k.startsWith("city_"))
     .map(k => k.replace("city_", ""));
 
-  if (keys.length === 0) {
-    alert("저장된 도시가 없습니다.");
-    return;
-  }
-
-  const name = prompt("불러올 도시 이름:\n" + keys.join(", "));
+  const name = prompt("불러올 도시 이름:\n" + keys.join("\n"));
   if (!name) return;
 
-  const data = localStorage.getItem("city_" + name);
-  if (!data) {
-    alert("해당 도시가 없습니다.");
-    return;
-  }
+  const raw = localStorage.getItem("city_" + name);
+  if (!raw) return;
 
-  const loaded = JSON.parse(data);
-  for (let y = 0; y < MAP_H; y++) {
-    for (let x = 0; x < MAP_W; x++) {
-      map[y][x] = loaded[y][x];
-    }
-  }
+  Object.keys(mapData).forEach(k => delete mapData[k]);
+
+  const data = JSON.parse(raw);
+  Object.entries(data).forEach(([k, v]) => {
+    const img = new Image();
+    img.src = v.src;
+    mapData[k] = { img, w: v.w, h: v.h };
+  });
 };
 
-window.captureCity = () => {
+window.captureCity = function () {
   const link = document.createElement("a");
   link.download = "city.png";
-  link.href = canvas.toDataURL("image/png");
+  link.href = canvas.toDataURL();
   link.click();
 };

@@ -13,25 +13,54 @@
     <!-- 상위 카테고리 -->
     <button class="category-btn" onclick="toggleCategory('tile')">타일</button>
     <div id="tile" class="subcategory">
-      <img src="assets/tiles/road_WDL.png" onclick="selectTile('road_WDL', this)" />
-      <img src="assets/tiles/road_WL.png" onclick="selectTile('road_WL', this)" />
-      <img src="assets/tiles/road_YL.png" onclick="selectTile('road_YL', this)" />
-      <img src="assets/tiles/road-sidewalk.png" onclick="selectTile('sidewalk', this)" />
-      <img src="assets/tiles/bush.png" onclick="selectTile('bush', this)" />
-      <img src="assets/tiles/road_WDL_curved.png" onclick="selectTile('road_WDL_curved', this)" />
-      <img src="assets/tiles/road_WL_curved.png" onclick="selectTile('road_WL_curved', this)" />
-      <img src="assets/tiles/road_YL_curved.png" onclick="selectTile('road_YL_curved', this)" />
-      <img src="assets/tiles/road-bush.png" onclick="selectTile('road_bush', this)" />
-      <img src="assets/tiles/road-sidewalk_curved.png" onclick="selectTile('road_sidewalk_curved', this)" />
-      <img src="assets/tiles/road-sidewalk_edge.png" onclick="selectTile('road_sidewalk_edge', this)" />
-      <img src="assets/tiles/road-bush_curved.png" onclick="selectTile('road_bush_curved', this)" />
-      <img src="assets/tiles/road-bush_edge.png" onclick="selectTile('road_bush_edge', this)" />
+      <img class="item" src="assets/tiles/road_WDL.png"
+          onclick="selectItem('tile', 0, this)" />
+
+      <img class="item" src="assets/tiles/road_WL.png"
+          onclick="selectItem('tile', 1, this)" />
+
+      <img class="item" src="assets/tiles/road_YL.png"
+          onclick="selectItem('tile', 2, this)" />
+
+      <img class="item" src="assets/tiles/road-sidewalk.png"
+          onclick="selectItem('tile', 3, this)" />
+
+      <img class="item" src="assets/tiles/bush.png"
+          onclick="selectItem('tile', 4, this)" />
+
+      <img class="item" src="assets/tiles/road_WDL_curved.png"
+          onclick="selectItem('tile', 5, this)" />
+
+      <img class="item" src="assets/tiles/road_WL_curved.png"
+          onclick="selectItem('tile', 6, this)" />
+
+      <img class="item" src="assets/tiles/road_YL_curved.png"
+          onclick="selectItem('tile', 7, this)" />
+
+      <img class="item" src="assets/tiles/road-bush.png"
+          onclick="selectItem('tile', 8, this)" />
+
+      <img class="item" src="assets/tiles/road-sidewalk_curved.png"
+          onclick="selectItem('tile', 9, this)" />
+
+      <img class="item" src="assets/tiles/road-sidewalk_edge.png"
+          onclick="selectItem('tile', 10, this)" />
+
+      <img class="item" src="assets/tiles/road-bush_curved.png"
+          onclick="selectItem('tile', 11, this)" />
+
+      <img class="item" src="assets/tiles/road-bush_edge.png"
+          onclick="selectItem('tile', 12, this)" />
     </div>
+
 
     <button class="category-btn" onclick="toggleCategory('housing')">주택</button>
     <div id="housing" class="subcategory">
-      <img src="assets/buildings/house.png" onclick="selectBuilding('house', this)" />
-      <img src="assets/buildings/apartment.png" onclick="selectBuilding('apartment', this)" />
+      <img class="item" src="assets/buildings/house.png"
+          onclick="selectItem('housing', 0, this)" />
+
+      <img class="item" src="assets/buildings/apartment.png"
+          onclick="selectItem('housing', 1, this)" />
     </div>
 
     <button class="category-btn" onclick="toggleCategory('commercial')">상가</button>
