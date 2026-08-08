@@ -11,15 +11,18 @@ body {
   position: fixed;
   left: 0;
   top: 0;
-  width: 220px;              /* ✅ 가로폭 고정 */
+  width: 220px;
   height: 100vh;
   background: #f5f5f5;
   border-right: 1px solid #ccc;
   padding: 10px;
+  padding-bottom: 44px;      /* 도시 이름 라벨 영역 확보 */
   box-sizing: border-box;
 
   display: flex;
   flex-direction: column;
+
+  overflow-y: auto;          /* 스크롤 활성화 */
 }
 
 /* ===== 카테고리 버튼 ===== */
@@ -64,30 +67,189 @@ body {
   border-color: #4caf50;
 }
 
-/* ===== 지우개 버튼 ===== */
-.eraser-btn {
+/* ===== variant 버튼 ===== */
+.variant-btn {
   margin-top: 10px;
+  padding: 8px;
+  width: 100%;
+  background: #e8f4e8;
+  border: 2px solid #7cb87c;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: bold;
+  color: #2e6b2e;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.variant-btn:hover:not(:disabled) {
+  background: #d0ebd0;
+  border-color: #4a9a4a;
+}
+
+.variant-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* ===== 모드 버튼 ===== */
+#mode-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.mode-btn {
+  padding: 9px 14px;
+  font-size: 13px;
+  font-weight: bold;
+  font-family: sans-serif;
+  cursor: pointer;
+  border: 1.5px solid #ccc;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.92);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+  transition: background 0.12s, border-color 0.12s, box-shadow 0.12s;
+  color: #555;
+  white-space: nowrap;
+}
+.mode-btn:hover {
+  background: #fff;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.14);
+}
+.mode-btn.mode-active {
+  background: #1a2332;
+  color: #fff;
+  border-color: #1a2332;
+  box-shadow: 0 2px 10px rgba(26,35,50,0.30);
+}
+
+#action-divider {
+  width: 1px;
+  background: rgba(0,0,0,0.12);
+  margin: 0 2px;
+  align-self: stretch;
+}
+
+/* ===== 사이드바 힌트 박스 ===== */
+#hint-box {
+  margin-top: 12px;
+  background: #2a3a52;
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.hint-row {
+  font-size: 11px;
+  color: #c8d8ec;
+  line-height: 1.4;
+}
+
+/* ===== 현재 도시 이름 ===== */
+#city-name-label {
+  position: fixed;
+  bottom: 0; left: 0;
+  width: 220px;
+  padding: 9px 12px;
+  background: #ececec;
+  border-top: 1px solid #ddd;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#city-name-text {
+  flex: 1;
+  font-size: 13px;
+  font-weight: bold;
+  color: #333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#city-name-edit-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  opacity: 0.45;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: opacity 0.1s, background 0.1s;
+  flex-shrink: 0;
+}
+#city-name-edit-btn:hover {
+  opacity: 1;
+  background: #ddd;
+}
+
+/* ===== 지우개 버튼 영역 ===== */
+#eraser-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.eraser-btn {
+  width: 100%;
   padding: 8px;
   background: #ffe0e0;
   border: 1px solid #cc8888;
+  border-radius: 4px;
   cursor: pointer;
+  font-size: 13px;
+  font-weight: bold;
+  text-align: center;
+  transition: background 0.12s;
 }
+.eraser-btn:hover { background: #ffd0d0; }
 
-/* ===== 하단 버튼 영역 ===== */
-#bottom-buttons {
-  position: absolute;        /* ✅ 무조건 아래 고정 */
-  bottom: 10px;
-  left: 10px;
-  right: 10px;
+.eraser-clear-btn {
+  background: #ffd0d0;
+  border-color: #bb6666;
+  color: #8b2020;
+}
+.eraser-clear-btn:hover { background: #ffbbbb; }
 
+/* ===== 우측 상단 액션 버튼 ===== */
+#action-buttons {
+  position: fixed;
+  top: 14px;
+  right: 16px;
+  z-index: 100;
   display: flex;
-  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
 }
 
-#bottom-buttons button {
-  flex: 1;
-  margin: 0 4px;
-  padding: 8px 0;
-  font-size: 18px;
+#action-buttons button {
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: bold;
+  font-family: sans-serif;
   cursor: pointer;
+  border: 1.5px solid #ccc;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.92);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+  transition: background 0.1s, box-shadow 0.1s, transform 0.1s;
+  white-space: nowrap;
+  color: #1a2332;
+}
+#action-buttons button:hover {
+  background: #fff;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.14);
+  transform: translateY(-1px);
+}
+#action-buttons #btn-overwrite {
+  background: rgba(230,245,255,0.95);
+  border-color: #4a7eb8;
+  color: #2a5a8a;
 }

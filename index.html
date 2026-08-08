@@ -2,72 +2,208 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>Isometric City Builder</title>
+  <title>City Builder</title>
   <link rel="stylesheet" href="style.css" />
+  <style>
+    /* ===== 타이틀 화면 ===== */
+    #title-screen {
+      position: fixed; inset: 0; z-index: 999;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 24px 16px;
+      background: linear-gradient(170deg, #d6eaf5 0%, #b8d4e8 50%, #a8c8e0 100%);
+      transition: opacity 0.4s;
+    }
+    #title-screen.hidden { opacity: 0; pointer-events: none; }
+    #title-screen::before {
+      content: ''; position: absolute; inset: 0; pointer-events: none;
+      opacity: 0.13;
+      background-image:
+        repeating-linear-gradient(26.57deg,  transparent 0px, transparent 31px, rgba(60,80,120,0.6) 31px, rgba(60,80,120,0.6) 32px),
+        repeating-linear-gradient(-26.57deg, transparent 0px, transparent 31px, rgba(60,80,120,0.6) 31px, rgba(60,80,120,0.6) 32px);
+      background-size: 64px 32px;
+    }
+
+    /* 타이틀 텍스트 */
+    .title-text {
+      position: relative;
+      text-align: center;
+      margin-bottom: 8px;
+      animation: tsFloatUp 0.65s cubic-bezier(.22,.68,0,1.2) both;
+    }
+    .title-main {
+      font-size: clamp(52px, 10vw, 80px);
+      font-weight: 900;
+      font-family: 'Arial Black', 'Impact', sans-serif;
+      color: #1a2332;
+      line-height: 1;
+      letter-spacing: -2px;
+      text-shadow: 0 4px 20px rgba(26,35,50,0.18);
+    }
+    .title-main .line1 {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .title-main .line2 {
+      display: block;
+      font-size: clamp(32px, 6vw, 50px);
+      letter-spacing: 8px;
+      color: #2a3a52;
+      margin-top: 2px;
+    }
+    .title-icon {
+      font-size: 0.75em;
+      line-height: 1;
+      filter: drop-shadow(0 2px 4px rgba(26,35,50,0.2));
+    }
+    .title-bar {
+      width: 160px; height: 3px; margin: 10px auto 0;
+      background: linear-gradient(90deg, transparent, #4a7eb8, transparent);
+      border-radius: 2px;
+    }
+
+    .title-subtitle {
+      position: relative;
+      font-size: 11px; font-weight: 700;
+      letter-spacing: 0.25em; color: #1a2332;
+      opacity: 0.45; text-transform: uppercase;
+      margin-bottom: 30px;
+      animation: tsFadeIn 0.5s 0.25s both;
+    }
+
+    .title-panel {
+      position: relative;
+      background: rgba(247,243,236,0.92);
+      backdrop-filter: blur(12px);
+      border-radius: 20px;
+      padding: 24px 26px 20px;
+      width: min(380px, 88vw);
+      box-shadow: 0 12px 48px rgba(26,35,50,0.18), 0 2px 0 rgba(255,255,255,0.6) inset;
+      animation: tsFadeIn 0.5s 0.35s both;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+
+    .title-btn {
+      width: 100%; padding: 14px 16px; border: none; border-radius: 12px;
+      font-family: inherit; font-size: 14px; font-weight: 700;
+      cursor: pointer; display: flex; align-items: center; gap: 10px;
+      transition: transform 0.12s, box-shadow 0.12s;
+    }
+    .title-btn:hover   { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(26,35,50,0.18); }
+    .title-btn:active  { transform: translateY(0); }
+    .title-btn:disabled { opacity: 0.4; cursor: default; transform: none !important; box-shadow: none !important; }
+    .title-btn-icon  { font-size: 20px; flex-shrink: 0; }
+    .title-btn-label { text-align: left; line-height: 1.3; }
+    .title-btn-label small { display: block; font-size: 11px; font-weight: 400; opacity: 0.65; margin-top: 1px; }
+
+    .btn-new-game  { background: linear-gradient(135deg, #7ab85a, #5a8a4a); color: #fff; box-shadow: 0 4px 14px rgba(90,138,74,0.35); }
+    .btn-load-game { background: linear-gradient(135deg, #4a7eb8, #2a5a8a); color: #fff; box-shadow: 0 4px 14px rgba(42,90,138,0.30); }
+    .title-divider { height: 1px; background: linear-gradient(90deg, transparent, #d0ccc0, transparent); }
+
+    /* 저장 목록 */
+    .saves-list { display: none; flex-direction: column; gap: 6px; max-height: 200px; overflow-y: auto; overflow-x: hidden; }
+    .saves-list.open { display: flex; }
+    .save-card {
+      background: #fff; border: 2px solid #e0dbd0; border-radius: 10px;
+      padding: 9px 10px; display: flex; align-items: center; gap: 6px;
+      transition: border-color 0.1s;
+      /* translateX 제거 — 수평 스크롤 방지 */
+      box-sizing: border-box;
+      width: 100%;
+    }
+    .save-card:hover { border-color: #4a7eb8; }
+    .save-card-info { flex: 1; cursor: pointer; min-width: 0; }
+    .save-card-name { font-size: 13px; font-weight: 700; color: #1a2332; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .save-card-sub  { font-size: 11px; color: #999; margin-top: 1px; }
+    .save-card-del  {
+      background: none; border: none; cursor: pointer;
+      font-size: 14px; opacity: 0.35; padding: 2px 4px;
+      border-radius: 4px; transition: opacity 0.1s, background 0.1s;
+      flex-shrink: 0;
+    }
+    .save-card-del:hover { opacity: 0.85; background: #ffeaea; }
+    .saves-empty { text-align: center; color: #bbb; font-size: 13px; padding: 12px 0; }
+
+    @keyframes tsFloatUp { from { opacity:0; transform:translateY(22px); } to { opacity:1; transform:translateY(0); } }
+    @keyframes tsFadeIn  { from { opacity:0; transform:translateY(8px);  } to { opacity:1; transform:translateY(0); } }
+  </style>
 </head>
 <body>
 
-  <!-- ===== 좌측 UI ===== -->
-  <div id="ui">
-
-    <!-- 상위 카테고리 -->
-    <button class="category-btn" onclick="toggleCategory('tile')">타일</button>
-    <div id="tile" class="subcategory">
-      <img class="item" src="assets/tiles/road_WDL.png"
-          onclick="selectItem('tile', 0, this)" />
-
-      <img class="item" src="assets/tiles/road_WL.png"
-          onclick="selectItem('tile', 1, this)" />
-
-      <img class="item" src="assets/tiles/road_YL.png"
-          onclick="selectItem('tile', 2, this)" />
-
-      <img class="item" src="assets/tiles/road-sidewalk.png"
-          onclick="selectItem('tile', 3, this)" />
-
-      <img class="item" src="assets/tiles/bush.png"
-          onclick="selectItem('tile', 4, this)" />
-
-      <img class="item" src="assets/tiles/road_WDL_curved.png"
-          onclick="selectItem('tile', 5, this)" />
-
-      <img class="item" src="assets/tiles/road_WL_curved.png"
-          onclick="selectItem('tile', 6, this)" />
-
-      <img class="item" src="assets/tiles/road_YL_curved.png"
-          onclick="selectItem('tile', 7, this)" />
-
-      <img class="item" src="assets/tiles/road-bush.png"
-          onclick="selectItem('tile', 8, this)" />
-
-      <img class="item" src="assets/tiles/road-sidewalk_curved.png"
-          onclick="selectItem('tile', 9, this)" />
-
-      <img class="item" src="assets/tiles/road-sidewalk_edge.png"
-          onclick="selectItem('tile', 10, this)" />
-
-      <img class="item" src="assets/tiles/road-bush_curved.png"
-          onclick="selectItem('tile', 11, this)" />
-
-      <img class="item" src="assets/tiles/road-bush_edge.png"
-          onclick="selectItem('tile', 12, this)" />
+  <!-- ===== 타이틀 화면 ===== -->
+  <div id="title-screen">
+    <div class="title-text">
+      <div class="title-main">
+        <div class="line1"><span class="title-icon">🏙</span>CITY</div>
+        <span class="line2">BUILDER</span>
+      </div>
+      <div class="title-bar"></div>
     </div>
 
+    <p class="title-subtitle">Build your dream city</p>
+
+    <div class="title-panel">
+      <button class="title-btn btn-new-game" onclick="titleStartNew()">
+        <span class="title-btn-icon">🏗</span>
+        <span class="title-btn-label">
+          새로 시작하기
+          <small>빈 맵에서 도시 건설을 시작합니다</small>
+        </span>
+      </button>
+
+      <div class="title-divider"></div>
+
+      <button class="title-btn btn-load-game" id="title-btn-load" onclick="titleToggleSaves()">
+        <span class="title-btn-icon">📂</span>
+        <span class="title-btn-label">
+          저장된 맵 불러오기
+          <small id="title-save-label">저장된 도시 확인 중…</small>
+        </span>
+      </button>
+
+      <div class="saves-list" id="title-saves-list"></div>
+    </div>
+  </div>
+
+  <!-- ===== 좌측 UI ===== -->
+  <div id="ui">
+    <button class="category-btn" onclick="toggleCategory('tile')">타일</button>
+    <div id="tile" class="subcategory">
+      <img class="item" src="assets/one-way-paths/bush.png"                           onclick="selectItem('tile', 0, this)" />
+      <img class="item" src="assets/one-way-paths/road.png"                           onclick="selectItem('tile', 1, this)" />
+      <img class="item" src="assets/one-way-paths/sidewalk.png"                       onclick="selectItem('tile', 2, this)" />
+      <img class="item" src="assets/two-way-paths/road_WDL_01.png"                    onclick="selectItem('tile', 3, this)" />
+      <img class="item" src="assets/two-way-paths/road_WL_01.png"                     onclick="selectItem('tile', 4, this)" />
+      <img class="item" src="assets/two-way-paths/road_YL_01.png"                     onclick="selectItem('tile', 5, this)" />
+      <img class="item" src="assets/four-way-paths/road_WDL_edge_01.png"              onclick="selectItem('tile', 6, this)" />
+      <img class="item" src="assets/four-way-paths/road_WL_edge_01.png"               onclick="selectItem('tile', 7, this)" />
+      <img class="item" src="assets/four-way-paths/road_YL_edge_01.png"               onclick="selectItem('tile', 8, this)" />
+      <img class="item" src="assets/four-way-paths/road-bush_innerEdge_01.png"        onclick="selectItem('tile', 9, this)" />
+      <img class="item" src="assets/four-way-paths/road-bush_outerEdge_01.png"        onclick="selectItem('tile', 10, this)" />
+      <img class="item" src="assets/four-way-paths/road-bush_01.png"                  onclick="selectItem('tile', 11, this)" />
+      <img class="item" src="assets/four-way-paths/road-sidewalk_innerEdge_01.png"    onclick="selectItem('tile', 12, this)" />
+      <img class="item" src="assets/four-way-paths/road-sidewalk_outerEdge_01.png"    onclick="selectItem('tile', 13, this)" />
+      <img class="item" src="assets/four-way-paths/road-sidewalk_01.png"              onclick="selectItem('tile', 14, this)" />
+    </div>
 
     <button class="category-btn" onclick="toggleCategory('housing')">주택</button>
     <div id="housing" class="subcategory">
-      <img class="item" src="assets/buildings/house.png"
-          onclick="selectItem('housing', 0, this)" />
-
-      <img class="item" src="assets/buildings/apartment.png"
-          onclick="selectItem('housing', 1, this)" />
+      <img class="item" src="assets/buildings/house_01.png"     onclick="selectItem('housing', 0, this)" />
+      <img class="item" src="assets/buildings/apartment_01.png" onclick="selectItem('housing', 1, this)" />
+      <img class="item" src="assets/buildings/villa_01.png" onclick="selectItem('housing', 2, this)" />
     </div>
 
     <button class="category-btn" onclick="toggleCategory('commercial')">상가</button>
-    <div id="commercial" class="subcategory"></div>
+    <div id="commercial" class="subcategory">
+      <img class="item" src="assets/buildings/commercial-building_01.png"     onclick="selectItem('commercial', 0, this)" />
+    </div>
 
     <button class="category-btn" onclick="toggleCategory('public')">관공서</button>
-    <div id="public" class="subcategory"></div>
+    <div id="public" class="subcategory">
+      <img class="item" src="assets/buildings/bank_01.png" onclick="selectItem('public', 0, this)" />
+    </div>
 
     <button class="category-btn" onclick="toggleCategory('industry')">산업시설</button>
     <div id="industry" class="subcategory"></div>
@@ -75,22 +211,182 @@
     <button class="category-btn" onclick="toggleCategory('etc')">기타</button>
     <div id="etc" class="subcategory"></div>
 
-    <!-- 지우개 (독립 버튼) -->
-    <button class="eraser-btn" onclick="selectEraser()">지우개</button>
+    <button id="btn-variant" class="variant-btn" onclick="cycleVariant()" disabled>🔄 variant</button>
 
-    <!-- 하단 버튼 -->
-    <div id="bottom-buttons">
-      <button title="저장" onclick="saveCity()">💾</button>
-      <button title="불러오기" onclick="loadCity()">📂</button>
-      <button title="캡쳐" onclick="captureCity()">📸</button>
+    <!-- 지우개 두 버튼 -->
+    <div id="eraser-buttons">
+      <button class="eraser-btn" onclick="selectEraser()">지우개</button>
+      <button class="eraser-btn eraser-clear-btn" onclick="clearMap()">전체 초기화</button>
     </div>
 
+    <!-- 조작 안내 -->
+    <div id="hint-box">
+      <div class="hint-row">🖱 우클릭 드래그 → 카메라 이동</div>
+      <div class="hint-row">🖱 휠 스크롤 → 줌 인/아웃</div>
+      <div class="hint-row">⌨ +/- 키 → 줌 조절</div>
+      <div class="hint-row">⌨ Home → 원점 복귀</div>
+      <div class="hint-row">⌨ V → variant 순환</div>
+    </div>
+
+    <!-- 현재 도시 이름 -->
+    <div id="city-name-label">
+      <span id="city-name-text">New Map</span>
+      <button id="city-name-edit-btn" onclick="editCityName()" title="이름 수정">✏️</button>
+    </div>
+
+  </div><!-- end #ui -->
+
+  <!-- ===== 우측 상단 액션 버튼 ===== -->
+  <div id="action-buttons">
+    <!-- 모드 전환 -->
+    <div id="mode-buttons">
+      <button id="btn-mode-move" class="mode-btn" onclick="setMoveMode(true)">✋ 이동</button>
+      <button id="btn-mode-select" class="mode-btn mode-active" onclick="setMoveMode(false)">✏️ 선택</button>
+    </div>
+    <div id="action-divider"></div>
+    <button id="btn-overwrite" onclick="overwriteCity()" style="display:none">덮어쓰기</button>
+    <button onclick="saveNewCity()">새로 저장</button>
+    <button onclick="captureCity()">화면 저장</button>
+    <button onclick="goToTitle()">메인으로</button>
   </div>
 
-  <!-- ===== 캔버스 ===== -->
   <canvas id="gameCanvas"></canvas>
-
-  <!-- JS -->
   <script src="main.js"></script>
+
+  <script>
+    /* ── 타이틀 유틸 ── */
+    function getTitleSaves() {
+      return Object.keys(localStorage)
+        .filter(k => k.startsWith("city_") && !k.startsWith("city_time_"))
+        .map(k => k.replace("city_", ""));
+    }
+
+    function getSaveTime(name) {
+      const t = localStorage.getItem("city_time_" + name);
+      if (!t) return "저장 시간 없음";
+      const d = new Date(Number(t));
+      return d.toLocaleString("ko-KR", { year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit" });
+    }
+
+    function refreshTitleSaveLabel() {
+      const saves   = getTitleSaves();
+      const loadBtn = document.getElementById("title-btn-load");
+      const label   = document.getElementById("title-save-label");
+      if (saves.length === 0) {
+        loadBtn.disabled = true;
+        label.textContent = "저장된 도시가 없습니다";
+      } else {
+        loadBtn.disabled = false;
+        label.textContent = `저장된 도시 ${saves.length}개`;
+      }
+    }
+    refreshTitleSaveLabel();
+
+    /* ── 현재 도시 이름 표시 ── */
+    function updateCityLabel() {
+      const el = document.getElementById("city-name-text");
+      if (!el) return;
+      el.textContent = (typeof currentCityName !== "undefined" && currentCityName)
+        ? currentCityName
+        : "New Map";
+    }
+    setInterval(updateCityLabel, 500);
+
+    /* ── 도시 이름 수정 ── */
+    function editCityName() {
+      const current = (typeof currentCityName !== "undefined" && currentCityName)
+        ? currentCityName : "";
+      const newName = prompt("도시 이름을 입력하세요", current);
+      if (!newName || newName.trim() === "") return;
+      const trimmed = newName.trim();
+      // 기존 저장 파일 이름도 변경
+      if (typeof currentCityName !== "undefined" && currentCityName) {
+        const raw  = localStorage.getItem("city_" + currentCityName);
+        const time = localStorage.getItem("city_time_" + currentCityName);
+        if (raw) {
+          localStorage.removeItem("city_" + currentCityName);
+          localStorage.removeItem("city_time_" + currentCityName);
+          localStorage.setItem("city_" + trimmed, raw);
+          if (time) localStorage.setItem("city_time_" + trimmed, time);
+        }
+      }
+      currentCityName = trimmed;
+      updateCityLabel();
+      updateBottomButtons();
+    }
+
+    /* ── 타이틀 화면 공통 페이드 ── */
+    function showTitleScreen() {
+      const ts = document.getElementById("title-screen");
+      ts.style.removeProperty("opacity");
+      ts.style.removeProperty("transition");
+      ts.style.display = "flex";
+      ts.classList.remove("hidden");
+      // 한 프레임 뒤에 opacity 1 확정 (display:flex 반영 후)
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        ts.style.transition = "opacity 0.35s";
+        ts.style.opacity = "1";
+      }));
+    }
+
+    function hideTitleScreen() {
+      const ts = document.getElementById("title-screen");
+      ts.style.removeProperty("transition");
+      ts.style.removeProperty("opacity");
+      // CSS의 transition: opacity 0.4s 가 작동
+      ts.classList.add("hidden");
+      setTimeout(() => { ts.style.display = "none"; }, 420);
+    }
+
+    /* ── 타이틀 버튼 동작 ── */
+    function titleStartNew() {
+      startNewMap();
+      updateCityLabel();
+      hideTitleScreen();
+    }
+
+    function titleToggleSaves() {
+      const list = document.getElementById("title-saves-list");
+      if (list.classList.contains("open")) { list.classList.remove("open"); return; }
+      renderSavesList();
+      list.classList.add("open");
+    }
+
+    function renderSavesList() {
+      const list  = document.getElementById("title-saves-list");
+      const saves = getTitleSaves();
+      list.innerHTML = "";
+      if (saves.length === 0) {
+        list.innerHTML = '<p class="saves-empty">저장된 도시가 없습니다</p>';
+        return;
+      }
+      saves.forEach(name => {
+        const card = document.createElement("div");
+        card.className = "save-card";
+        card.innerHTML = `
+          <div class="save-card-info">
+            <div class="save-card-name">🏙 ${name}</div>
+            <div class="save-card-sub">${getSaveTime(name)}</div>
+          </div>
+          <button class="save-card-del" title="삭제">🗑</button>`;
+        card.querySelector(".save-card-info").onclick = () => {
+          loadCityByName(name);
+          updateCityLabel();
+          hideTitleScreen();
+        };
+        card.querySelector(".save-card-del").onclick = (e) => {
+          e.stopPropagation();
+          if (!confirm(`"${name}" 을(를) 삭제하겠습니까?`)) return;
+          localStorage.removeItem("city_" + name);
+          localStorage.removeItem("city_time_" + name);
+          refreshTitleSaveLabel();
+          renderSavesList();
+          if (getTitleSaves().length === 0)
+            document.getElementById("title-saves-list").classList.remove("open");
+        };
+        list.appendChild(card);
+      });
+    }
+  </script>
 </body>
 </html>
