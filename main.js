@@ -313,7 +313,7 @@ let moveMode = false;
 window.setMoveMode = function (val) {
   moveMode = val;
   hoverIso = null;
-  canvas.style.cursor = val ? "grab" : "default";
+  canvas.style.cursor = val ? "crosshair" : "default";
   document.getElementById("btn-mode-move").classList.toggle("mode-active", val);
   document.getElementById("btn-mode-select").classList.toggle("mode-active", !val);
 };
@@ -452,7 +452,7 @@ window.addEventListener("mousemove", e => {
 window.addEventListener("mouseup", e => {
   if (drag.active && (e.button === 2 || (e.button === 0 && moveMode))) {
     drag.active = false;
-    canvas.style.cursor = moveMode ? "grab" : "default";
+    canvas.style.cursor = moveMode ? "crosshair" : "default";
   }
 });
 canvas.addEventListener("contextmenu", e => e.preventDefault());
@@ -476,8 +476,12 @@ canvas.addEventListener("wheel", e => {
 /*************************
  * 키보드
  *************************/
+function resetCamera() {
+  camera.x = 0; camera.y = 0; camera.zoom = 1;
+}
+
 window.addEventListener("keydown", e => {
-  if (e.key === "Home") { camera.x = 0; camera.y = 0; camera.zoom = 1; }
+  if (e.key === "Home") resetCamera();
   if (e.key === "+" || e.key === "=") camera.zoom = Math.min(camera.maxZoom, camera.zoom * 1.15);
   if (e.key === "-") camera.zoom = Math.max(camera.minZoom, camera.zoom * 0.87);
   if (e.key === "v" || e.key === "V") cycleVariant();
@@ -693,6 +697,7 @@ window.startNewMap = function () {
   Object.keys(mapData).forEach(k => delete mapData[k]);
   currentCityName = null;
   savedSnapshot = "{}";
+  resetCamera();
   updateBottomButtons();
 };
 
@@ -707,6 +712,7 @@ window.goToTitle = function () {
   currentCityName = null;
   savedSnapshot = "{}";
   Object.keys(mapData).forEach(k => delete mapData[k]);
+  resetCamera();
   updateBottomButtons();
 
   // 타이틀 화면 표시
