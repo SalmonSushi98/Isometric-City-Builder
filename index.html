@@ -215,9 +215,12 @@
 
     <!-- 지우개 두 버튼 -->
     <div id="eraser-buttons">
-      <button class="eraser-btn" onclick="selectEraser()">지우개</button>
+      <button class="eraser-btn" onclick="selectEraser()">오브젝트 삭제</button>
       <button class="eraser-btn eraser-clear-btn" onclick="clearMap()">전체 초기화</button>
     </div>
+
+    <!-- 선택 모드 패널 -->
+    <div id="select-panel" style="display:none"></div>
 
     <!-- 조작 안내 -->
     <div id="hint-box">
@@ -240,8 +243,9 @@
   <div id="action-buttons">
     <!-- 모드 전환 -->
     <div id="mode-buttons">
-      <button id="btn-mode-move" class="mode-btn" onclick="setMoveMode(true)">✋ 이동</button>
-      <button id="btn-mode-select" class="mode-btn mode-active" onclick="setMoveMode(false)">✏️ 선택</button>
+      <button id="btn-mode-build"  class="mode-btn mode-active" onclick="setEditMode('build')">🔨 제작</button>
+      <button id="btn-mode-select" class="mode-btn"             onclick="setEditMode('select')">👆 선택</button>
+      <button id="btn-mode-move"   class="mode-btn"             onclick="setEditMode('move')">✋ 이동</button>
     </div>
     <div id="action-divider"></div>
     <button id="btn-overwrite" onclick="overwriteCity()" style="display:none">덮어쓰기</button>

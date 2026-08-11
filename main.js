@@ -304,19 +304,39 @@ let showHint = false; // 캔버스 힌트 제거
 function drawHint() {} // 사이드바로 이동됨
 
 /*************************
- * 이동 모드 상태
- * moveMode=true  → 좌클릭 드래그로 카메라 이동
- * moveMode=false → 기존 선택/제작 모드
+ * 편집 모드
+ * "move"   → 좌클릭 드래그로 카메라 이동
+ * "build"  → 타일 선택 후 클릭 배치 (제작 모드)
+ * "select" → 셀 클릭 후 패널에서 배치/삭제/방향 변경
  *************************/
-let moveMode = false;
+let editMode = "build";
+let selectedCell = null;
 
-window.setMoveMode = function (val) {
-  moveMode = val;
-  hoverIso = null;
-  canvas.style.cursor = val ? "crosshair" : "default";
-  document.getElementById("btn-mode-move").classList.toggle("mode-active", val);
-  document.getElementById("btn-mode-select").classList.toggle("mode-active", !val);
+window.setEditMode = function (mode) {
+  editMode     = mode;
+  hoverIso     = null;
+  eraseMode    = false;
+  selectedCell = null;
+  drag.active  = false;
+  drag.moved   = false;
+  canvas.style.cursor = "default";
+
+  document.getElementById("btn-mode-move").classList.toggle("mode-active",   mode === "move");
+  document.getElementById("btn-mode-build").classList.toggle("mode-active",  mode === "build");
+  document.getElementById("btn-mode-select").classList.toggle("mode-active", mode === "select");
+
+  const panel = document.getElementById("select-panel");
+  if (panel) panel.style.display = "none";
+
+  updateEraseBtnState();
 };
+
+function updateEraseBtnState() {
+  const btn = document.querySelector(".eraser-btn:not(.eraser-clear-btn)");
+  if (!btn) return;
+  btn.disabled = (editMode !== "build");
+  btn.style.opacity = (editMode !== "build") ? "0.4" : "1";
+}
 
 /*************************
  * variant 표시 배지
@@ -432,7 +452,7 @@ function render() {
  * 카메라 — 드래그 (우클릭 항상 / 좌클릭은 moveMode일 때)
  *************************/
 canvas.addEventListener("mousedown", e => {
-  const isMoveBtn = e.button === 2 || (e.button === 0 && moveMode);
+  const isMoveBtn = e.button === 2 || (e.button === 0 && editMode === "move");
   if (!isMoveBtn) return;
   drag.active    = true;
   drag.startX    = e.clientX;
@@ -450,9 +470,10 @@ window.addEventListener("mousemove", e => {
   }
 });
 window.addEventListener("mouseup", e => {
-  if (drag.active && (e.button === 2 || (e.button === 0 && moveMode))) {
+  if (!drag.active) return;
+  if (e.button === 2 || (e.button === 0 && editMode === "move")) {
     drag.active = false;
-    canvas.style.cursor = moveMode ? "crosshair" : "default";
+    canvas.style.cursor = "default";
   }
 });
 canvas.addEventListener("contextmenu", e => e.preventDefault());
@@ -491,55 +512,72 @@ window.addEventListener("keydown", e => {
  * 호버
  *************************/
 canvas.addEventListener("mousemove", e => {
-  if (drag.active || moveMode) { hoverIso = null; return; }
+  if (drag.active || editMode === "move") { hoverIso = null; return; }
   const iso = screenToIso(e.offsetX, e.offsetY);
   hoverIso = (iso.x < 0 || iso.y < 0 || iso.x >= MAP_W || iso.y >= MAP_H) ? null : iso;
 });
 canvas.addEventListener("mouseleave", () => { hoverIso = null; });
 
 /*************************
- * 클릭 — 배치 / 지우기 (선택 모드에서만)
+ * 클릭 핸들러 — 모드별 동작
  *************************/
 canvas.addEventListener("click", e => {
-  if (moveMode || drag.moved) return; // 이동 모드 또는 드래그 후엔 배치 무시
-  if (!hoverIso) return;
+  if (editMode === "move" || drag.moved) return;
   const { x, y } = hoverIso;
   const key = `${x},${y}`;
 
-  if (eraseMode) {
-    const cell = mapData[key];
-    if (!cell) return;
-    const originKey = cell.origin ? key : cell.originKey;
-    const origin    = mapData[originKey];
-    if (origin) {
-      const [ox, oy] = originKey.split(",").map(Number);
-      getOccupiedCells(ox, oy, origin.tilesX, origin.tilesY)
-        .forEach(c => delete mapData[`${c.x},${c.y}`]);
+  /* ── 제작 모드 ── */
+  if (editMode === "build") {
+    if (eraseMode) {
+      const cell = mapData[key];
+      if (!cell) return;
+      const originKey = cell.origin ? key : cell.originKey;
+      const origin    = mapData[originKey];
+      if (origin) {
+        const [ox, oy] = originKey.split(",").map(Number);
+        getOccupiedCells(ox, oy, origin.tilesX, origin.tilesY)
+          .forEach(c => delete mapData[`${c.x},${c.y}`]);
+      }
+      return;
     }
+    if (!currentItem) return;
+    const { tilesX, tilesY } = getCurrentTiles();
+    const ox        = x - (tilesX - 1);
+    const oy        = y - (tilesY - 1);
+    const originKey = `${ox},${oy}`;
+    const cells     = getOccupiedCells(ox, oy, tilesX, tilesY);
+    const blocked   = cells.some(c =>
+      c.x < 0 || c.y < 0 || c.x >= MAP_W || c.y >= MAP_H || !!mapData[`${c.x},${c.y}`]
+    );
+    if (blocked) return;
+    const img = getCurrentImg();
+    cells.forEach(c => {
+      const isOrigin = (c.x === ox && c.y === oy);
+      mapData[`${c.x},${c.y}`] = isOrigin
+        ? { img, w: currentItem.w, h: currentItem.h, tilesX, tilesY, origin: true,
+            variantSrc: getItemSrc(currentItem, currentVariant) }
+        : { origin: false, originKey };
+    });
     return;
   }
 
-  if (!currentItem) return;
+  /* ── 선택 모드 ── */
+  if (editMode === "select") {
+    const panel = document.getElementById("select-panel");
+    const cell  = mapData[key];
 
-  const { tilesX, tilesY } = getCurrentTiles();
-  const ox        = x - (tilesX - 1);
-  const oy        = y - (tilesY - 1);
-  const originKey = `${ox},${oy}`;
-  const cells     = getOccupiedCells(ox, oy, tilesX, tilesY);
-
-  const blocked = cells.some(c =>
-    c.x < 0 || c.y < 0 || c.x >= MAP_W || c.y >= MAP_H || !!mapData[`${c.x},${c.y}`]
-  );
-  if (blocked) return;
-
-  const img = getCurrentImg();
-  cells.forEach(c => {
-    const isOrigin = (c.x === ox && c.y === oy);
-    mapData[`${c.x},${c.y}`] = isOrigin
-      ? { img, w: currentItem.w, h: currentItem.h, tilesX, tilesY, origin: true,
-          variantSrc: getItemSrc(currentItem, currentVariant) }
-      : { origin: false, originKey };
-  });
+    if (cell) {
+      // 오브젝트가 있는 셀 클릭 → 삭제/방향 패널
+      const originKey = cell.origin ? key : cell.originKey;
+      selectedCell = originKey;
+      showSelectPanel(originKey, false);
+    } else {
+      // 빈 셀 클릭 → 타일 배치 패널
+      selectedCell = key;
+      showSelectPanel(key, true);
+    }
+    return;
+  }
 });
 
 /*************************
@@ -586,11 +624,76 @@ function updateVariantUI() {
 }
 
 window.selectEraser = function () {
+  setEditMode("build"); // 반드시 build 모드로
   eraseMode   = true;
   currentItem = null;
   updateVariantUI();
   document.querySelectorAll(".subcategory img").forEach(i => i.classList.remove("selected"));
 };
+
+/*************************
+ * 선택 모드 패널
+ *************************/
+function showSelectPanel(cellKey, isEmpty) {
+  const panel = document.getElementById("select-panel");
+  if (!panel) return;
+
+  panel.innerHTML = "";
+  panel.style.display = "flex";
+
+  if (!isEmpty) {
+    // 오브젝트가 있는 셀 — 삭제 버튼
+    const delBtn = document.createElement("button");
+    delBtn.className = "select-panel-btn select-panel-del";
+    delBtn.textContent = "🗑 삭제";
+    delBtn.onclick = () => {
+      const origin = mapData[cellKey];
+      if (origin) {
+        const [ox, oy] = cellKey.split(",").map(Number);
+        getOccupiedCells(ox, oy, origin.tilesX, origin.tilesY)
+          .forEach(c => delete mapData[`${c.x},${c.y}`]);
+      }
+      panel.style.display = "none";
+      selectedCell = null;
+    };
+    panel.appendChild(delBtn);
+  } else {
+    // 빈 셀 — 현재 선택된 타일 설치 버튼
+    const label = document.createElement("div");
+    label.className = "select-panel-label";
+    label.textContent = currentItem ? `"${currentItem.id}" 설치` : "타일을 먼저 선택하세요";
+    panel.appendChild(label);
+
+    if (currentItem) {
+      const placeBtn = document.createElement("button");
+      placeBtn.className = "select-panel-btn select-panel-place";
+      placeBtn.textContent = "✔ 설치";
+      placeBtn.onclick = () => {
+        const [x, y]        = cellKey.split(",").map(Number);
+        const { tilesX, tilesY } = getCurrentTiles();
+        const ox        = x - (tilesX - 1);
+        const oy        = y - (tilesY - 1);
+        const originKey = `${ox},${oy}`;
+        const cells     = getOccupiedCells(ox, oy, tilesX, tilesY);
+        const blocked   = cells.some(c =>
+          c.x < 0 || c.y < 0 || c.x >= MAP_W || c.y >= MAP_H || !!mapData[`${c.x},${c.y}`]
+        );
+        if (blocked) { showToast("이미 오브젝트가 있습니다."); return; }
+        const img = getCurrentImg();
+        cells.forEach(c => {
+          const isOrigin = (c.x === ox && c.y === oy);
+          mapData[`${c.x},${c.y}`] = isOrigin
+            ? { img, w: currentItem.w, h: currentItem.h, tilesX, tilesY, origin: true,
+                variantSrc: getItemSrc(currentItem, currentVariant) }
+            : { origin: false, originKey };
+        });
+        panel.style.display = "none";
+        selectedCell = null;
+      };
+      panel.appendChild(placeBtn);
+    }
+  }
+}
 
 /*************************
  * 저장 / 불러오기 / 캡쳐

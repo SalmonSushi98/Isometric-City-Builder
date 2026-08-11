@@ -131,6 +131,39 @@ body {
   align-self: stretch;
 }
 
+/* ===== 선택 모드 패널 ===== */
+#select-panel {
+  margin-top: 10px;
+  background: #f0f4f8;
+  border: 1.5px solid #c0ccd8;
+  border-radius: 8px;
+  padding: 10px;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.select-panel-label {
+  font-size: 12px;
+  color: #445;
+  font-weight: bold;
+  text-align: center;
+}
+
+.select-panel-btn {
+  width: 100%;
+  padding: 9px;
+  border: none;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: filter 0.1s;
+}
+.select-panel-btn:hover { filter: brightness(0.93); }
+
+.select-panel-del   { background: #ffd0d0; color: #8b2020; }
+.select-panel-place { background: #c8eac8; color: #1a5a1a; }
+
 /* ===== 사이드바 힌트 박스 ===== */
 #hint-box {
   margin-top: 12px;
