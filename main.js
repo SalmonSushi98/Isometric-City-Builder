@@ -394,7 +394,40 @@ function drawTiles() {
   });
 }
 
+/*************************
+ * 선택 모드 전용 프리뷰
+ * — 이미지 프리뷰 없음, 빈 칸은 초록 1칸, 오브젝트 칸은 빨강(전체 점유 칸)
+ * — selectedCell(빈 칸 선택 시)은 패널이 닫힐 때까지 계속 표시됨
+ *************************/
+function drawSelectPreview() {
+  // 클릭으로 선택된 빈 칸 — 계속 유지되는 초록 프리뷰
+  if (selectedCell && !mapData[selectedCell]) {
+    const [sx, sy] = selectedCell.split(",").map(Number);
+    fillDiamond(sx, sy, "rgba(0,200,0,0.30)");
+  }
+
+  if (!hoverIso) return;
+  const { x, y } = hoverIso;
+  const key  = `${x},${y}`;
+  const cell = mapData[key];
+
+  if (!cell) {
+    // 이미 선택 표시 중인 칸이면 중복으로 다시 그리지 않아도 무방 (동일 색상)
+    fillDiamond(x, y, "rgba(0,200,0,0.30)");
+  } else {
+    const originKey = cell.origin ? key : cell.originKey;
+    const origin    = mapData[originKey];
+    if (origin) {
+      const [ox, oy] = originKey.split(",").map(Number);
+      getOccupiedCells(ox, oy, origin.tilesX, origin.tilesY)
+        .forEach(c => fillDiamond(c.x, c.y, "rgba(255,0,0,0.35)"));
+    }
+  }
+}
+
 function drawPreview() {
+  if (editMode === "select") { drawSelectPreview(); return; }
+
   if (!hoverIso) return;
   const { x, y } = hoverIso;
 
@@ -522,7 +555,9 @@ canvas.addEventListener("mouseleave", () => { hoverIso = null; });
  * 클릭 핸들러 — 모드별 동작
  *************************/
 canvas.addEventListener("click", e => {
-  if (editMode === "move" || drag.moved) return;
+  if (editMode === "move") return;
+  if (drag.moved) { drag.moved = false; return; } // 드래그 후 클릭 무시하고 초기화
+  if (!hoverIso) return;
   const { x, y } = hoverIso;
   const key = `${x},${y}`;
 
@@ -675,10 +710,13 @@ function showSelectPanel(cellKey, isEmpty) {
         const oy        = y - (tilesY - 1);
         const originKey = `${ox},${oy}`;
         const cells     = getOccupiedCells(ox, oy, tilesX, tilesY);
-        const blocked   = cells.some(c =>
-          c.x < 0 || c.y < 0 || c.x >= MAP_W || c.y >= MAP_H || !!mapData[`${c.x},${c.y}`]
-        );
-        if (blocked) { showToast("이미 오브젝트가 있습니다."); return; }
+        const outOfBounds = cells.some(c => c.x < 0 || c.y < 0 || c.x >= MAP_W || c.y >= MAP_H);
+        const overlapping = !outOfBounds && cells.some(c => !!mapData[`${c.x},${c.y}`]);
+        if (outOfBounds) { showToast("설치 위치를 조정해주세요."); return; }
+        if (overlapping) {
+          showToast(tilesX * tilesY > 1 ? "설치 위치를 조정해주세요." : "이미 오브젝트가 있습니다.");
+          return;
+        }
         const img = getCurrentImg();
         cells.forEach(c => {
           const isOrigin = (c.x === ox && c.y === oy);
@@ -790,6 +828,8 @@ window.loadCityByName = function (name) {
   });
   currentCityName = name;
   syncSnapshot();
+  resetCamera();
+  setEditMode("build");
   updateBottomButtons();
 };
 
@@ -801,6 +841,7 @@ window.startNewMap = function () {
   currentCityName = null;
   savedSnapshot = "{}";
   resetCamera();
+  setEditMode("build");
   updateBottomButtons();
 };
 
@@ -816,6 +857,7 @@ window.goToTitle = function () {
   savedSnapshot = "{}";
   Object.keys(mapData).forEach(k => delete mapData[k]);
   resetCamera();
+  setEditMode("build");
   updateBottomButtons();
 
   // 타이틀 화면 표시
