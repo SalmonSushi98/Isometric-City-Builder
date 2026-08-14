@@ -376,17 +376,30 @@ function drawGrid() {
 }
 
 function drawTiles() {
-  const sorted = Object.entries(mapData)
+  const entries = Object.entries(mapData)
     .filter(([, t]) => t.origin)
     .map(([key, tile]) => {
       const [x, y] = key.split(",").map(Number);
-      // 다중 타일은 점유 셀 중 최대 (x+y)를 정렬 기준으로 사용
-      const sortKey = (x + tile.tilesX - 1) + (y + tile.tilesY - 1);
-      return { x, y, tile, sortKey };
-    })
-    .sort((a, b) => a.sortKey - b.sortKey);
+      return {
+        x, y, tile,
+        xMin: x, xMax: x + tile.tilesX - 1,
+        yMin: y, yMax: y + tile.tilesY - 1
+      };
+    });
 
-  sorted.forEach(({ x, y, tile }) => {
+  // 두 오브젝트의 점유 범위를 통째로 비교: 한쪽이 두 축 모두에서
+  // 확실히 뒤에 있을 때만 먼저 그림. 애매하면(대각선상 인접 등)
+  // 먼 쪽 모서리 합, 그다음 가까운 쪽 모서리 합으로 순서를 정함.
+  entries.sort((a, b) => {
+    const aFar  = a.xMax + a.yMax, bNear = b.xMin + b.yMin;
+    if (aFar <= bNear) return -1;
+    const bFar  = b.xMax + b.yMax, aNear = a.xMin + a.yMin;
+    if (bFar <= aNear) return 1;
+    if (aFar !== bFar) return aFar - bFar;
+    return aNear - bNear;
+  });
+
+  entries.forEach(({ x, y, tile }) => {
     const tw = tile.w * camera.zoom;
     const th = tile.h * camera.zoom;
     const a  = getAnchor(x, y, tile.tilesX, tile.tilesY);
@@ -598,22 +611,57 @@ canvas.addEventListener("click", e => {
 
   /* ── 선택 모드 ── */
   if (editMode === "select") {
-    const panel = document.getElementById("select-panel");
-    const cell  = mapData[key];
+    const cell = mapData[key];
 
     if (cell) {
-      // 오브젝트가 있는 셀 클릭 → 삭제/방향 패널
+      // 오브젝트가 있는 셀 클릭 → 삭제 패널
       const originKey = cell.origin ? key : cell.originKey;
       selectedCell = originKey;
       showSelectPanel(originKey, false);
     } else {
-      // 빈 셀 클릭 → 타일 배치 패널
+      // 빈 셀 클릭 → 초록색으로 선택 표시만. 자동 설치는 하지 않음
+      // (설치는 이후 사이드바에서 타일/건물을 클릭할 때만 이루어짐)
       selectedCell = key;
       showSelectPanel(key, true);
     }
     return;
   }
 });
+
+/*************************
+ * 선택 모드: 지정한 칸에 현재 선택된 아이템 설치 시도
+ * 성공 시 true, 막히면 토스트를 띄우고 false 반환
+ *************************/
+function tryPlaceAtCell(cellKey) {
+  const [x, y]        = cellKey.split(",").map(Number);
+  const { tilesX, tilesY } = getCurrentTiles();
+  const ox        = x - (tilesX - 1);
+  const oy        = y - (tilesY - 1);
+  const originKey = `${ox},${oy}`;
+  const cells     = getOccupiedCells(ox, oy, tilesX, tilesY);
+  const outOfBounds = cells.some(c => c.x < 0 || c.y < 0 || c.x >= MAP_W || c.y >= MAP_H);
+  const overlapping = !outOfBounds && cells.some(c => !!mapData[`${c.x},${c.y}`]);
+  if (outOfBounds) { showToast("설치 위치를 조정해주세요."); return false; }
+  if (overlapping) {
+    showToast(tilesX * tilesY > 1 ? "설치 위치를 조정해주세요." : "이미 오브젝트가 있습니다.");
+    return false;
+  }
+  const img = getCurrentImg();
+  cells.forEach(c => {
+    const isOrigin = (c.x === ox && c.y === oy);
+    mapData[`${c.x},${c.y}`] = isOrigin
+      ? { img, w: currentItem.w, h: currentItem.h, tilesX, tilesY, origin: true,
+          variantSrc: getItemSrc(currentItem, currentVariant) }
+      : { origin: false, originKey };
+  });
+  return true;
+}
+
+function hideSelectPanel() {
+  const panel = document.getElementById("select-panel");
+  if (panel) panel.style.display = "none";
+  selectedCell = null;
+}
 
 /*************************
  * UI 제어
@@ -639,6 +687,11 @@ window.selectItem = function (cat, idx, el) {
 
   document.querySelectorAll(".subcategory img").forEach(i => i.classList.remove("selected"));
   el.classList.add("selected");
+
+  // 선택 모드에서 이미 빈 칸이 선택돼 있다면 바로 그 칸에 설치
+  if (editMode === "select" && selectedCell && !mapData[selectedCell]) {
+    if (tryPlaceAtCell(selectedCell)) hideSelectPanel();
+  }
 };
 
 // Variant 순환 (V키 또는 버튼)
@@ -688,48 +741,15 @@ function showSelectPanel(cellKey, isEmpty) {
         getOccupiedCells(ox, oy, origin.tilesX, origin.tilesY)
           .forEach(c => delete mapData[`${c.x},${c.y}`]);
       }
-      panel.style.display = "none";
-      selectedCell = null;
+      hideSelectPanel();
     };
     panel.appendChild(delBtn);
   } else {
-    // 빈 셀 — 현재 선택된 타일 설치 버튼
+    // 빈 셀 — 사이드바에서 타일/건물을 고르면 바로 이 칸에 설치됨
     const label = document.createElement("div");
     label.className = "select-panel-label";
-    label.textContent = currentItem ? `"${currentItem.id}" 설치` : "타일을 먼저 선택하세요";
+    label.textContent = "사이드바에서 타일이나 건물을 선택하면\n이 칸에 바로 설치됩니다";
     panel.appendChild(label);
-
-    if (currentItem) {
-      const placeBtn = document.createElement("button");
-      placeBtn.className = "select-panel-btn select-panel-place";
-      placeBtn.textContent = "✔ 설치";
-      placeBtn.onclick = () => {
-        const [x, y]        = cellKey.split(",").map(Number);
-        const { tilesX, tilesY } = getCurrentTiles();
-        const ox        = x - (tilesX - 1);
-        const oy        = y - (tilesY - 1);
-        const originKey = `${ox},${oy}`;
-        const cells     = getOccupiedCells(ox, oy, tilesX, tilesY);
-        const outOfBounds = cells.some(c => c.x < 0 || c.y < 0 || c.x >= MAP_W || c.y >= MAP_H);
-        const overlapping = !outOfBounds && cells.some(c => !!mapData[`${c.x},${c.y}`]);
-        if (outOfBounds) { showToast("설치 위치를 조정해주세요."); return; }
-        if (overlapping) {
-          showToast(tilesX * tilesY > 1 ? "설치 위치를 조정해주세요." : "이미 오브젝트가 있습니다.");
-          return;
-        }
-        const img = getCurrentImg();
-        cells.forEach(c => {
-          const isOrigin = (c.x === ox && c.y === oy);
-          mapData[`${c.x},${c.y}`] = isOrigin
-            ? { img, w: currentItem.w, h: currentItem.h, tilesX, tilesY, origin: true,
-                variantSrc: getItemSrc(currentItem, currentVariant) }
-            : { origin: false, originKey };
-        });
-        panel.style.display = "none";
-        selectedCell = null;
-      };
-      panel.appendChild(placeBtn);
-    }
   }
 }
 
@@ -768,17 +788,22 @@ function syncSnapshot() {
 // 새로 저장하기
 window.saveNewCity = function () {
   const name = prompt("도시 이름을 입력하세요");
-  if (!name) return;
-  if (localStorage.getItem("city_" + name)) {
+  if (name === null) return; // 취소
+  const trimmed = name.trim();
+  if (trimmed === "") {
+    showToast("도시 이름을 입력해주세요.");
+    return;
+  }
+  if (localStorage.getItem("city_" + trimmed)) {
     alert("이미 존재하는 이름입니다. 다른 이름을 입력해주세요.");
     return;
   }
-  localStorage.setItem("city_" + name, JSON.stringify(serializeMap()));
-  localStorage.setItem("city_time_" + name, Date.now().toString());
-  currentCityName = name;
+  localStorage.setItem("city_" + trimmed, JSON.stringify(serializeMap()));
+  localStorage.setItem("city_time_" + trimmed, Date.now().toString());
+  currentCityName = trimmed;
   syncSnapshot();
   updateBottomButtons();
-  showToast(`"${name}" 저장 완료!`);
+  showToast(`"${trimmed}" 저장 완료!`);
 };
 
 // 덮어쓰기 저장
