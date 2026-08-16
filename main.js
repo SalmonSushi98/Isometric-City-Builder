@@ -11,6 +11,27 @@ const MAP_W = 20;
 const MAP_H = 20;
 
 /*************************
+ * 터치 기기 감지 (모바일 안내문구 / 스타일 분기용)
+ *************************/
+if (("ontouchstart" in window) || navigator.maxTouchPoints > 0) {
+  document.body.classList.add("is-touch");
+}
+
+/*************************
+ * 모바일 사이드바 토글
+ *************************/
+window.toggleSidebar = function (force) {
+  const ui  = document.getElementById("ui");
+  const bg  = document.getElementById("ui-backdrop");
+  if (!ui) return;
+  const open = (typeof force === "boolean") ? force : !ui.classList.contains("open");
+  ui.classList.toggle("open", open);
+  if (bg) bg.classList.toggle("open", open);
+  const btn = document.getElementById("ui-toggle-btn");
+  if (btn) btn.textContent = open ? "✕" : "☰";
+};
+
+/*************************
  * 카메라 상태
  *************************/
 const camera = { x: 0, y: 0, zoom: 1, minZoom: 0.3, maxZoom: 3 };
@@ -319,6 +340,9 @@ window.setEditMode = function (mode) {
   selectedCell = null;
   drag.active  = false;
   drag.moved   = false;
+  touchStart   = null;
+  touchIsDrag  = false;
+  pinch        = null;
   canvas.style.cursor = "default";
 
   document.getElementById("btn-mode-move").classList.toggle("mode-active",   mode === "move");
@@ -541,6 +565,128 @@ canvas.addEventListener("wheel", e => {
 }, { passive: false });
 
 /*************************
+ * 터치 입력 (모바일)
+ * — 손가락 하나: 짧게 떼면 탭(배치/선택), 움직이면 카메라 드래그
+ * — 손가락 두 개: 핀치 줌 + 두 손가락 이동으로 카메라 팬
+ *************************/
+const TOUCH_DRAG_THRESHOLD = 10; // px, 이 이상 움직이면 탭이 아니라 드래그로 간주
+
+let touchStart   = null;  // { x, y } 화면 좌표, 손가락 하나 시작 지점
+let touchIsDrag  = false;
+let pinch        = null;  // 두 손가락 핀치줌 상태
+
+function touchIso(t) {
+  const rect = canvas.getBoundingClientRect();
+  const ox = t.clientX - rect.left;
+  const oy = t.clientY - rect.top;
+  const iso = screenToIso(ox, oy);
+  return (iso.x < 0 || iso.y < 0 || iso.x >= MAP_W || iso.y >= MAP_H) ? null : iso;
+}
+function touchDist(t0, t1) { return Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY); }
+function touchMid(t0, t1)  { return { x: (t0.clientX + t1.clientX) / 2, y: (t0.clientY + t1.clientY) / 2 }; }
+
+canvas.addEventListener("touchstart", e => {
+  e.preventDefault();
+  if (e.touches.length === 1) {
+    const t = e.touches[0];
+    touchStart   = { x: t.clientX, y: t.clientY };
+    touchIsDrag  = false;
+    pinch        = null;
+    drag.camStartX = camera.x;
+    drag.camStartY = camera.y;
+    hoverIso = (editMode === "move") ? null : touchIso(t);
+  } else if (e.touches.length === 2) {
+    touchStart = null;
+    touchIsDrag = false;
+    hoverIso = null;
+    const [t0, t1] = e.touches;
+    pinch = {
+      startDist:  touchDist(t0, t1),
+      startZoom:  camera.zoom,
+      mid:        touchMid(t0, t1)
+    };
+  }
+}, { passive: false });
+
+canvas.addEventListener("touchmove", e => {
+  e.preventDefault();
+
+  if (e.touches.length === 2 && pinch) {
+    const [t0, t1] = e.touches;
+    const dist    = touchDist(t0, t1);
+    const mid     = touchMid(t0, t1);
+    const newZoom = Math.min(camera.maxZoom, Math.max(camera.minZoom, pinch.startZoom * (dist / pinch.startDist)));
+
+    // 확대 중심 유지
+    const rect = canvas.getBoundingClientRect();
+    const mx = pinch.mid.x - rect.left;
+    const my = pinch.mid.y - rect.top;
+    const o  = getIsoOrigin();
+    const ratio = newZoom / camera.zoom;
+    camera.x += (mx - o.x) * (1 - ratio);
+    camera.y += (my - o.y) * (1 - ratio);
+    camera.zoom = newZoom;
+
+    // 두 손가락 이동분만큼 추가로 팬
+    camera.x += mid.x - pinch.mid.x;
+    camera.y += mid.y - pinch.mid.y;
+    pinch.mid = mid;
+    return;
+  }
+
+  if (e.touches.length === 1 && touchStart) {
+    const t  = e.touches[0];
+    const dx = t.clientX - touchStart.x;
+    const dy = t.clientY - touchStart.y;
+
+    if (!touchIsDrag && Math.hypot(dx, dy) > TOUCH_DRAG_THRESHOLD) {
+      touchIsDrag = true;
+      hoverIso = null;
+    }
+
+    if (touchIsDrag) {
+      camera.x = drag.camStartX + dx;
+      camera.y = drag.camStartY + dy;
+    } else if (editMode !== "move") {
+      hoverIso = touchIso(t);
+    }
+  }
+}, { passive: false });
+
+canvas.addEventListener("touchend", e => {
+  e.preventDefault();
+  const wasPinch = !!pinch;
+  if (e.touches.length < 2) pinch = null;
+
+  if (e.touches.length === 1 && wasPinch) {
+    // 핀치줌 중 손가락 하나를 뗀 경우 — 남은 손가락으로 드래그를 이어감 (탭 오인 방지)
+    const t = e.touches[0];
+    touchStart  = { x: t.clientX, y: t.clientY };
+    touchIsDrag = true;
+    drag.camStartX = camera.x;
+    drag.camStartY = camera.y;
+    hoverIso = null;
+    return;
+  }
+
+  if (e.touches.length === 0) {
+    if (touchStart && !touchIsDrag && editMode !== "move") {
+      handleTap(hoverIso);
+    }
+    touchStart  = null;
+    touchIsDrag = false;
+    hoverIso    = null;
+  }
+}, { passive: false });
+
+canvas.addEventListener("touchcancel", () => {
+  touchStart  = null;
+  touchIsDrag = false;
+  pinch       = null;
+  hoverIso    = null;
+});
+
+/*************************
  * 키보드
  *************************/
 function resetCamera() {
@@ -565,13 +711,11 @@ canvas.addEventListener("mousemove", e => {
 canvas.addEventListener("mouseleave", () => { hoverIso = null; });
 
 /*************************
- * 클릭 핸들러 — 모드별 동작
+ * 탭/클릭 처리 — 모드별 동작 (마우스 클릭과 터치 탭이 공용으로 사용)
  *************************/
-canvas.addEventListener("click", e => {
-  if (editMode === "move") return;
-  if (drag.moved) { drag.moved = false; return; } // 드래그 후 클릭 무시하고 초기화
-  if (!hoverIso) return;
-  const { x, y } = hoverIso;
+function handleTap(iso) {
+  if (!iso) return;
+  const { x, y } = iso;
   const key = `${x},${y}`;
 
   /* ── 제작 모드 ── */
@@ -626,6 +770,12 @@ canvas.addEventListener("click", e => {
     }
     return;
   }
+}
+
+canvas.addEventListener("click", e => {
+  if (editMode === "move") return;
+  if (drag.moved) { drag.moved = false; return; } // 드래그 후 클릭 무시하고 초기화
+  handleTap(hoverIso);
 });
 
 /*************************

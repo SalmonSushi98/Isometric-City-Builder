@@ -2,6 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <title>City Builder</title>
   <link rel="stylesheet" href="style.css" />
   <style>
@@ -145,6 +146,10 @@
     </div>
   </div>
 
+  <!-- ===== 모바일 사이드바 토글 (좁은 화면에서만 보임) ===== -->
+  <button id="ui-toggle-btn" onclick="toggleSidebar()" aria-label="메뉴 열기/닫기">☰</button>
+  <div id="ui-backdrop" onclick="toggleSidebar(false)"></div>
+
   <!-- ===== 좌측 UI ===== -->
   <div id="ui">
     <button class="category-btn" onclick="toggleCategory('tile')">타일</button>
@@ -202,14 +207,19 @@
 
     <!-- 조작 안내 -->
     <div id="hint-box">
-      <div class="hint-row">🖱 우클릭 드래그 → 카메라 이동</div>
-      <div class="hint-row">🖱 휠 스크롤 → 줌 인/아웃</div>
-      <div class="hint-row">⌨ +/- 키 → 줌 조절</div>
-      <div class="hint-row">⌨ Home → 원점 복귀</div>
-      <div class="hint-row">⌨ V → variant 순환</div>
+      <div class="hint-row hint-desktop">🖱 우클릭 드래그 → 카메라 이동</div>
+      <div class="hint-row hint-desktop">🖱 휠 스크롤 → 줌 인/아웃</div>
+      <div class="hint-row hint-desktop">⌨ +/- 키 → 줌 조절</div>
+      <div class="hint-row hint-desktop">⌨ Home → 원점 복귀</div>
+      <div class="hint-row hint-desktop">⌨ V → variant 순환</div>
+
+      <div class="hint-row hint-touch">👆 탭 → 배치 / 선택</div>
+      <div class="hint-row hint-touch">🖐 한 손가락 드래그 → 카메라 이동</div>
+      <div class="hint-row hint-touch">🤏 두 손가락 → 확대/축소</div>
+      <div class="hint-row hint-touch">🔄 variant 버튼 → variant 순환</div>
     </div>
 
-    <!-- 현재 도시 이름 -->
+    <!-- 현재 도시 이름 (사이드바 하단에 고정, 드로어와 함께 슬라이드됨) -->
     <div id="city-name-label">
       <span id="city-name-text">New Map</span>
       <button id="city-name-edit-btn" style="display:none" onclick="editCityName()" title="이름 수정">✏️</button>
@@ -221,15 +231,15 @@
   <div id="action-buttons">
     <!-- 모드 전환 -->
     <div id="mode-buttons">
-      <button id="btn-mode-build"  class="mode-btn mode-active" onclick="setEditMode('build')">🔨 제작</button>
-      <button id="btn-mode-select" class="mode-btn"             onclick="setEditMode('select')">👆 선택</button>
-      <button id="btn-mode-move"   class="mode-btn"             onclick="setEditMode('move')">✋ 이동</button>
+      <button id="btn-mode-build"  class="mode-btn mode-active" onclick="setEditMode('build')">🔨<span class="btn-label"> 제작</span></button>
+      <button id="btn-mode-select" class="mode-btn"             onclick="setEditMode('select')">👆<span class="btn-label"> 선택</span></button>
+      <button id="btn-mode-move"   class="mode-btn"             onclick="setEditMode('move')">✋<span class="btn-label"> 이동</span></button>
     </div>
     <div id="action-divider"></div>
-    <button id="btn-overwrite" onclick="overwriteCity()" style="display:none">덮어쓰기</button>
-    <button onclick="saveNewCity()">새로 저장</button>
-    <button onclick="captureCity()">화면 저장</button>
-    <button onclick="goToTitle()">메인으로</button>
+    <button id="btn-overwrite" onclick="overwriteCity()" style="display:none">💾<span class="btn-label"> 덮어쓰기</span></button>
+    <button onclick="saveNewCity()">💾<span class="btn-label"> 새로 저장</span></button>
+    <button onclick="captureCity()">📷<span class="btn-label"> 화면 저장</span></button>
+    <button onclick="goToTitle()">🏠<span class="btn-label"> 메인으로</span></button>
   </div>
 
   <canvas id="gameCanvas"></canvas>

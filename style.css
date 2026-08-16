@@ -1,9 +1,23 @@
 /* ===== 전체 ===== */
-body {
+html, body {
   margin: 0;
   overflow: hidden;
   font-family: sans-serif;
   background: #fff;
+  height: 100%;
+  overscroll-behavior: none;        /* 당겨서 새로고침/바운스 스크롤 방지 */
+  -webkit-tap-highlight-color: transparent; /* 모바일 탭 시 파란 하이라이트 제거 */
+}
+
+button, .subcategory img {
+  -webkit-touch-callout: none;      /* 롱프레스 시 메뉴/이미지 저장 팝업 방지 */
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* ===== 캔버스 ===== */
+#gameCanvas {
+  touch-action: none;               /* 브라우저 기본 스크롤/줌 제스처와 충돌 방지, 터치 핸들러가 전담 */
 }
 
 /* ===== UI 영역 ===== */
@@ -13,10 +27,10 @@ body {
   top: 0;
   width: 220px;
   height: 100vh;
+  height: 100dvh;
   background: #f5f5f5;
   border-right: 1px solid #ccc;
   padding: 10px;
-  padding-bottom: 44px;      /* 도시 이름 라벨 영역 확보 */
   box-sizing: border-box;
 
   display: flex;
@@ -25,10 +39,37 @@ body {
   overflow-y: auto;          /* 스크롤 활성화 (휠로 이동 가능) */
   scrollbar-width: none;     /* Firefox: 스크롤바 숨김 */
   -ms-overflow-style: none;  /* 구형 Edge/IE: 스크롤바 숨김 */
+
+  z-index: 150;
+  transition: transform 0.25s ease;
 }
 
 #ui::-webkit-scrollbar {
   display: none;             /* Chrome/Safari: 스크롤바 숨김 */
+}
+
+/* ===== 모바일 사이드바 토글 버튼 / 배경 오버레이 ===== */
+#ui-toggle-btn {
+  display: none;             /* 데스크톱에서는 숨김, 좁은 화면 미디어쿼리에서 표시 */
+  position: fixed;
+  top: 12px; left: 12px;
+  z-index: 210;
+  width: 42px; height: 42px;
+  border: 1.5px solid #ccc;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.92);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.14);
+  font-size: 18px;
+  cursor: pointer;
+}
+
+#ui-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(20,26,36,0.4);
+  z-index: 140;
 }
 
 /* ===== 카테고리 버튼 ===== */
@@ -194,12 +235,20 @@ body {
   line-height: 1.4;
 }
 
+/* 터치 기기에서는 터치용 안내를, 그 외에는 데스크톱용 안내를 표시 */
+.hint-touch { display: none; }
+body.is-touch .hint-desktop { display: none; }
+body.is-touch .hint-touch   { display: block; }
+
 /* ===== 현재 도시 이름 ===== */
 #city-name-label {
-  position: fixed;
-  bottom: 0; left: 0;
-  width: 220px;
+  margin-top: auto;          /* 사이드바 flex 흐름의 맨 아래로 고정 (드로어와 함께 슬라이드됨) */
+  flex-shrink: 0;
+  width: 100%;
   padding: 9px 12px;
+  margin-left: -10px;        /* #ui의 padding 상쇄, 가로 전체 폭 사용 */
+  margin-right: -10px;
+  width: calc(100% + 20px);
   background: #ececec;
   border-top: 1px solid #ddd;
   box-sizing: border-box;
@@ -298,4 +347,61 @@ body {
   background: rgba(230,245,255,0.95);
   border-color: #4a7eb8;
   color: #2a5a8a;
+}
+
+/* ======================================================
+   모바일 / 좁은 화면 대응
+   ====================================================== */
+@media (max-width: 720px), (pointer: coarse) and (max-width: 900px) {
+
+  /* 사이드바를 드로어(서랍) 형태로 전환 — 기본은 화면 밖으로 숨김 */
+  #ui {
+    width: min(78vw, 280px);
+    transform: translateX(-100%);
+    box-shadow: 4px 0 24px rgba(0,0,0,0.25);
+  }
+  #ui.open {
+    transform: translateX(0);
+  }
+  #ui-toggle-btn {
+    display: block;
+  }
+  #ui-backdrop.open {
+    display: block;
+  }
+
+  /* 캔버스를 가리지 않도록 상단 액션 버튼 크기를 줄이고 줄바꿈 허용 */
+  #action-buttons {
+    top: 10px;
+    right: 10px;
+    max-width: calc(100vw - 64px); /* 좌측 햄버거 버튼과 겹치지 않도록 */
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+  #action-buttons button,
+  .mode-btn {
+    padding: 10px 12px;
+    font-size: 15px;         /* 아이콘만 남으므로 살짝 키움 */
+    min-width: 44px;
+    min-height: 44px;
+  }
+  /* 라벨 텍스트는 숨기고 아이콘만 표시 (버튼 크기를 압축) */
+  #action-buttons .btn-label {
+    display: none;
+  }
+
+  /* 터치 타겟 확대 */
+  .category-btn {
+    padding: 12px 8px;
+    font-size: 14px;
+  }
+  .eraser-btn, .select-panel-btn, .variant-btn {
+    padding: 12px;
+    font-size: 14px;
+  }
+  #city-name-edit-btn {
+    padding: 8px 10px;
+    font-size: 16px;
+  }
 }
