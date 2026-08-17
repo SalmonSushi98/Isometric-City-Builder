@@ -428,6 +428,12 @@ body.is-touch .hint-touch   { display: block; }
     display: none;
   }
 
+  /* 모바일에서는 손가락 드래그가 어떤 모드에서든 카메라 이동을 처리하므로
+     "이동" 모드 버튼은 불필요함 */
+  #btn-mode-move {
+    display: none;
+  }
+
   /* 터치 타겟 확대 (사이드바 자체가 좁아졌으므로 여백은 과하지 않게) */
   .category-btn {
     padding: 9px 6px;
