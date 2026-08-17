@@ -58,6 +58,14 @@ let currentVariant = 0;
 let continuousPlacement = true; // 연속 배치 on/off (꺼지면 배치 1회 후 선택 해제)
 let currentCityName = null; // 타이틀에서 불러온 맵 이름 (null이면 새 게임)
 
+// 두 개의 레이어로 분리: 타일(바닥)과 건물
+// - tileData: 바닥 타일 (도로/인도/수풀 등). ITEMS.tile 항목은 전부 1x1이므로
+//   origin/occupied 구조는 건물과 동일한 포맷을 재사용하되 항상 1칸만 차지함.
+// - mapData: 건물(1x1 이상, 다중 타일 가능). 기존과 동일한 구조.
+// 같은 칸에 타일과 건물이 동시에 존재할 수 있음 — 배치/충돌 판정은 각자의
+// 레이어끼리만 검사하고(타일↔타일, 건물↔건물), 렌더링은 타일을 먼저 그리고
+// 그 위에 건물을 그려서 타일이 항상 건물보다 아래에 보이도록 함.
+const tileData = {};
 const mapData = {};
 
 /*************************
@@ -399,6 +407,20 @@ function drawGrid() {
   }
 }
 
+// 바닥 타일 레이어 — 항상 1x1이라 z-order 정렬이 필요 없음(서로 겹치지 않음).
+// 건물보다 먼저 그려서 항상 맨 아래에 위치하도록 함.
+function drawGroundTiles() {
+  Object.entries(tileData)
+    .filter(([, t]) => t.origin)
+    .forEach(([key, tile]) => {
+      const [x, y] = key.split(",").map(Number);
+      const tw = tile.w * camera.zoom;
+      const th = tile.h * camera.zoom;
+      const a  = getAnchor(x, y, tile.tilesX, tile.tilesY);
+      drawImg(tile.img, a.sx, a.sy, tw, th);
+    });
+}
+
 function drawTiles() {
   const entries = Object.entries(mapData)
     .filter(([, t]) => t.origin)
@@ -437,21 +459,28 @@ function drawTiles() {
  *************************/
 function drawSelectPreview() {
   // 클릭으로 선택된 오브젝트 — 패널이 닫힐 때까지 계속 유지되는 빨강 프리뷰
-  if (selectedCell && mapData[selectedCell]) {
-    const origin = mapData[selectedCell];
-    const [sx, sy] = selectedCell.split(",").map(Number);
-    getOccupiedCells(sx, sy, origin.tilesX, origin.tilesY)
-      .forEach(c => fillDiamond(c.x, c.y, "rgba(255,0,0,0.35)"));
+  if (selectedCell) {
+    const layerData = selectedCell.layer === "tile" ? tileData : mapData;
+    const origin = layerData[selectedCell.key];
+    if (origin) {
+      const [sx, sy] = selectedCell.key.split(",").map(Number);
+      getOccupiedCells(sx, sy, origin.tilesX, origin.tilesY)
+        .forEach(c => fillDiamond(c.x, c.y, "rgba(255,0,0,0.35)"));
+    }
   }
 
   if (!hoverIso) return;
   const { x, y } = hoverIso;
-  const key  = `${x},${y}`;
-  const cell = mapData[key];
+  const key = `${x},${y}`;
+
+  // 건물이 있으면 건물(위 레이어)을 우선 표시, 없으면 타일을 표시
+  let cell = mapData[key];
+  let layerData = mapData;
+  if (!cell) { cell = tileData[key]; layerData = tileData; }
   if (!cell) return; // 빈 칸은 선택 모드에서 아무 것도 표시하지 않음 (배치 불가)
 
   const originKey = cell.origin ? key : cell.originKey;
-  const origin    = mapData[originKey];
+  const origin    = layerData[originKey];
   if (origin) {
     const [ox, oy] = originKey.split(",").map(Number);
     getOccupiedCells(ox, oy, origin.tilesX, origin.tilesY)
@@ -466,11 +495,14 @@ function drawPreview() {
   const { x, y } = hoverIso;
 
   if (eraseMode) {
-    const key  = `${x},${y}`;
-    const cell = mapData[key];
+    const key = `${x},${y}`;
+    // 건물이 있으면 건물(위 레이어)부터 지워질 것을 표시, 없으면 타일 표시
+    let cell = mapData[key];
+    let layerData = mapData;
+    if (!cell) { cell = tileData[key]; layerData = tileData; }
     if (!cell) return;
     const originKey = cell.origin ? key : cell.originKey;
-    const origin    = mapData[originKey];
+    const origin    = layerData[originKey];
     if (origin) {
       const [ox, oy] = originKey.split(",").map(Number);
       getOccupiedCells(ox, oy, origin.tilesX, origin.tilesY)
@@ -481,13 +513,16 @@ function drawPreview() {
 
   if (!currentItem) return;
 
+  // 타일은 타일 레이어끼리만, 건물은 건물 레이어끼리만 충돌 검사
+  // (타일 위에 건물을 올리거나 건물이 있는 곳에 타일을 까는 것은 허용)
+  const layerData = currentItem.type === "tile" ? tileData : mapData;
   const { tilesX, tilesY } = getCurrentTiles();
   const ox     = x - (tilesX - 1);
   const oy     = y - (tilesY - 1);
   const cells  = getOccupiedCells(ox, oy, tilesX, tilesY);
 
   const blocked = cells.some(c =>
-    c.x < 0 || c.y < 0 || c.x >= MAP_W || c.y >= MAP_H || !!mapData[`${c.x},${c.y}`]
+    c.x < 0 || c.y < 0 || c.x >= MAP_W || c.y >= MAP_H || !!layerData[`${c.x},${c.y}`]
   );
 
   cells.forEach(c => fillDiamond(c.x, c.y, blocked ? "rgba(255,0,0,0.35)" : "rgba(0,200,0,0.30)"));
@@ -506,6 +541,7 @@ function drawPreview() {
 function render() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   drawGrid();
+  drawGroundTiles();
   drawTiles();
   drawPreview();
   drawZoomIndicator();
@@ -718,31 +754,36 @@ function handleTap(iso) {
   /* ── 제작 모드 ── */
   if (editMode === "build") {
     if (eraseMode) {
-      const cell = mapData[key];
+      // 건물이 있으면 건물(위 레이어)부터 지움, 없으면 타일을 지움
+      let cell = mapData[key];
+      let layerData = mapData;
+      if (!cell) { cell = tileData[key]; layerData = tileData; }
       if (!cell) return;
       const originKey = cell.origin ? key : cell.originKey;
-      const origin    = mapData[originKey];
+      const origin    = layerData[originKey];
       if (origin) {
         const [ox, oy] = originKey.split(",").map(Number);
         getOccupiedCells(ox, oy, origin.tilesX, origin.tilesY)
-          .forEach(c => delete mapData[`${c.x},${c.y}`]);
+          .forEach(c => delete layerData[`${c.x},${c.y}`]);
       }
       return;
     }
     if (!currentItem) return;
+    // 타일은 타일 레이어끼리만, 건물은 건물 레이어끼리만 충돌 검사
+    const layerData  = currentItem.type === "tile" ? tileData : mapData;
     const { tilesX, tilesY } = getCurrentTiles();
     const ox        = x - (tilesX - 1);
     const oy        = y - (tilesY - 1);
     const originKey = `${ox},${oy}`;
     const cells     = getOccupiedCells(ox, oy, tilesX, tilesY);
     const blocked   = cells.some(c =>
-      c.x < 0 || c.y < 0 || c.x >= MAP_W || c.y >= MAP_H || !!mapData[`${c.x},${c.y}`]
+      c.x < 0 || c.y < 0 || c.x >= MAP_W || c.y >= MAP_H || !!layerData[`${c.x},${c.y}`]
     );
     if (blocked) return;
     const img = getCurrentImg();
     cells.forEach(c => {
       const isOrigin = (c.x === ox && c.y === oy);
-      mapData[`${c.x},${c.y}`] = isOrigin
+      layerData[`${c.x},${c.y}`] = isOrigin
         ? { img, w: currentItem.w, h: currentItem.h, tilesX, tilesY, origin: true,
             variantSrc: getItemSrc(currentItem, currentVariant) }
         : { origin: false, originKey };
@@ -759,12 +800,15 @@ function handleTap(iso) {
 
   /* ── 선택 모드 (배치 없음: 이미 놓인 오브젝트의 삭제/방향 전환만) ── */
   if (editMode === "select") {
-    const cell = mapData[key];
+    // 건물이 있으면 건물(위 레이어)을 우선 선택, 없으면 타일을 선택
+    let cell  = mapData[key];
+    let layer = "building";
+    if (!cell) { cell = tileData[key]; layer = "tile"; }
 
     if (cell) {
       const originKey = cell.origin ? key : cell.originKey;
-      selectedCell = originKey;
-      showSelectPanel(originKey);
+      selectedCell = { key: originKey, layer };
+      showSelectPanel(originKey, layer);
     } else {
       hideSelectPanel();
     }
@@ -801,8 +845,9 @@ function findItemByVariantSrc(src) {
  * 선택 모드: 이미 놓인 오브젝트의 방향(variant) 전환
  * 자리를 벗어나거나 다른 오브젝트와 겹치면 토스트를 띄우고 취소
  *************************/
-function rotateObjectAt(originKey) {
-  const origin = mapData[originKey];
+function rotateObjectAt(originKey, layer) {
+  const layerData = layer === "tile" ? tileData : mapData;
+  const origin = layerData[originKey];
   if (!origin) return false;
 
   const found = findItemByVariantSrc(origin.variantSrc);
@@ -831,18 +876,18 @@ function rotateObjectAt(originKey) {
   const outOfBounds = newCells.some(c => c.x < 0 || c.y < 0 || c.x >= MAP_W || c.y >= MAP_H);
   const overlapping = !outOfBounds && newCells.some(c => {
     const k = `${c.x},${c.y}`;
-    return !oldKeys.has(k) && !!mapData[k];
+    return !oldKeys.has(k) && !!layerData[k];
   });
   if (outOfBounds || overlapping) {
     showToast("방향을 바꿀 공간이 부족합니다.");
     return false;
   }
 
-  oldCells.forEach(c => delete mapData[`${c.x},${c.y}`]);
+  oldCells.forEach(c => delete layerData[`${c.x},${c.y}`]);
   const img = loadImg(newSrc);
   newCells.forEach(c => {
     const isOrigin = (c.x === ox && c.y === oy);
-    mapData[`${c.x},${c.y}`] = isOrigin
+    layerData[`${c.x},${c.y}`] = isOrigin
       ? { img, w: origin.w, h: origin.h, tilesX: newTilesX, tilesY: newTilesY, origin: true, variantSrc: newSrc }
       : { origin: false, originKey };
   });
@@ -886,7 +931,7 @@ window.selectItem = function (cat, idx, el) {
 window.cycleVariant = function () {
   if (!currentItem) return;
   const total = currentItem.variants.length;
-  if (total <= 1) { showToast("이 타일은 variant가 없습니다."); return; }
+  if (total <= 1) { showToast("이 오브젝트는 회전할 수 없습니다."); return; }
   currentVariant = (currentVariant + 1) % total;
   updateVariantUI();
 };
@@ -896,7 +941,7 @@ function updateVariantUI() {
   if (!btn) return;
   const total = currentItem ? currentItem.variants.length : 0;
   btn.disabled = total <= 1;
-  btn.textContent = total > 1 ? `🔄 variant (${currentVariant + 1}/${total})` : "🔄 variant";
+  btn.textContent = total > 1 ? `🔄 회전 (${currentVariant + 1}/${total})` : "🔄 회전";
 }
 
 // 연속 배치 on/off 토글
@@ -928,9 +973,10 @@ window.selectEraser = function () {
 /*************************
  * 선택 모드 패널 (배치 없음: 방향 전환 + 삭제만)
  *************************/
-function showSelectPanel(cellKey) {
-  const panel  = document.getElementById("select-panel");
-  const origin = mapData[cellKey];
+function showSelectPanel(cellKey, layer) {
+  const panel     = document.getElementById("select-panel");
+  const layerData = layer === "tile" ? tileData : mapData;
+  const origin    = layerData[cellKey];
   if (!panel || !origin) return;
 
   panel.innerHTML = "";
@@ -941,10 +987,10 @@ function showSelectPanel(cellKey) {
 
   const rotateBtn = document.createElement("button");
   rotateBtn.className = "select-panel-btn select-panel-rotate";
-  rotateBtn.textContent = "🔄 방향 전환";
+  rotateBtn.textContent = "🔄 회전";
   rotateBtn.disabled = !canRotate;
   rotateBtn.onclick = () => {
-    if (rotateObjectAt(cellKey)) showSelectPanel(cellKey); // 패널 새로고침
+    if (rotateObjectAt(cellKey, layer)) showSelectPanel(cellKey, layer); // 패널 새로고침
   };
   panel.appendChild(rotateBtn);
 
@@ -954,7 +1000,7 @@ function showSelectPanel(cellKey) {
   delBtn.onclick = () => {
     const [ox, oy] = cellKey.split(",").map(Number);
     getOccupiedCells(ox, oy, origin.tilesX, origin.tilesY)
-      .forEach(c => delete mapData[`${c.x},${c.y}`]);
+      .forEach(c => delete layerData[`${c.x},${c.y}`]);
     hideSelectPanel();
   };
   panel.appendChild(delBtn);
@@ -963,10 +1009,10 @@ function showSelectPanel(cellKey) {
 /*************************
  * 저장 / 불러오기 / 캡쳐
  *************************/
-// 맵 데이터를 직렬화해서 반환
-function serializeMap() {
+// 한 레이어(mapData 또는 tileData)를 직렬화용 평면 객체로 변환
+function serializeLayer(layerData) {
   const data = {};
-  Object.entries(mapData).forEach(([k, v]) => {
+  Object.entries(layerData).forEach(([k, v]) => {
     if (v.origin) {
       data[k] = { src: v.variantSrc, w: v.w, h: v.h, tilesX: v.tilesX, tilesY: v.tilesY, origin: true };
     } else {
@@ -976,8 +1022,16 @@ function serializeMap() {
   return data;
 }
 
+// 맵 데이터를 직렬화해서 반환 (타일 레이어 + 건물 레이어)
+function serializeMap() {
+  return {
+    tiles: serializeLayer(tileData),
+    buildings: serializeLayer(mapData),
+  };
+}
+
 // 저장 시점 스냅샷 (변경 감지용)
-let savedSnapshot = "{}";
+let savedSnapshot = JSON.stringify({ tiles: {}, buildings: {} });
 
 function getCurrentSnapshot() {
   return JSON.stringify(serializeMap());
@@ -1026,12 +1080,25 @@ window.overwriteCity = function () {
 window.clearMap = function () {
   if (!confirm("맵을 초기화하겠습니까?\n배치한 모든 오브젝트가 삭제됩니다.")) return;
   Object.keys(mapData).forEach(k => delete mapData[k]);
+  Object.keys(tileData).forEach(k => delete tileData[k]);
 };
 
 window.captureCity = function () {
+  let dataUrl;
+  try {
+    dataUrl = canvas.toDataURL("image/png");
+  } catch (err) {
+    // 캔버스가 "오염(tainted)" 상태인 경우(SecurityError) 발생.
+    // 타일/건물 이미지가 한 개라도 그려진 후에만 발생함(빈 맵일 땐 정상).
+    // 가장 흔한 원인은 index.html을 file:// 로 직접 열었을 때,
+    // 로컬 이미지가 브라우저에 의해 교차 출처로 취급되는 경우임.
+    console.error("화면 저장 실패:", err);
+    showToast("화면 저장에 실패했습니다. index.html을 파일로 직접 열었다면 로컬 서버로 실행해 주세요.");
+    return;
+  }
   const link = document.createElement("a");
   link.download = "city.png";
-  link.href = canvas.toDataURL();
+  link.href = dataUrl;
   link.click();
 };
 
@@ -1044,20 +1111,33 @@ function updateBottomButtons() {
 /*************************
  * 이름으로 도시 불러오기 (타이틀에서 호출)
  *************************/
+// 직렬화된 레이어 하나를 mapData/tileData 같은 실제 레이어 객체로 복원
+function deserializeLayer(layerData, data) {
+  Object.entries(data).forEach(([k, v]) => {
+    if (v.origin) {
+      layerData[k] = { img: loadImg(v.src), w: v.w, h: v.h,
+        tilesX: v.tilesX || 1, tilesY: v.tilesY || 1,
+        origin: true, variantSrc: v.src };
+    } else {
+      layerData[k] = { origin: false, originKey: v.originKey };
+    }
+  });
+}
+
 window.loadCityByName = function (name) {
   const raw = localStorage.getItem("city_" + name);
   if (!raw) return;
   Object.keys(mapData).forEach(k => delete mapData[k]);
+  Object.keys(tileData).forEach(k => delete tileData[k]);
   const data = JSON.parse(raw);
-  Object.entries(data).forEach(([k, v]) => {
-    if (v.origin) {
-      mapData[k] = { img: loadImg(v.src), w: v.w, h: v.h,
-        tilesX: v.tilesX || 1, tilesY: v.tilesY || 1,
-        origin: true, variantSrc: v.src };
-    } else {
-      mapData[k] = { origin: false, originKey: v.originKey };
-    }
-  });
+
+  // 신 포맷: { tiles, buildings }. 구 포맷(타일 레이어 도입 전)은 건물만
+  // 평면 객체로 저장되어 있었으므로 그대로 buildings로 취급해 하위 호환 유지.
+  const buildings = data.buildings || data;
+  const tiles     = data.tiles || {};
+  deserializeLayer(mapData, buildings);
+  deserializeLayer(tileData, tiles);
+
   currentCityName = name;
   syncSnapshot();
   resetCamera();
@@ -1070,8 +1150,9 @@ window.loadCityByName = function (name) {
  *************************/
 window.startNewMap = function () {
   Object.keys(mapData).forEach(k => delete mapData[k]);
+  Object.keys(tileData).forEach(k => delete tileData[k]);
   currentCityName = null;
-  savedSnapshot = "{}";
+  savedSnapshot = JSON.stringify({ tiles: {}, buildings: {} });
   resetCamera();
   setEditMode("build");
   updateBottomButtons();
@@ -1086,8 +1167,9 @@ window.goToTitle = function () {
   }
   // 현재 편집 상태 초기화
   currentCityName = null;
-  savedSnapshot = "{}";
+  savedSnapshot = JSON.stringify({ tiles: {}, buildings: {} });
   Object.keys(mapData).forEach(k => delete mapData[k]);
+  Object.keys(tileData).forEach(k => delete tileData[k]);
   resetCamera();
   setEditMode("build");
   updateBottomButtons();
