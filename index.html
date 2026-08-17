@@ -196,9 +196,11 @@
 
     <button id="btn-variant" class="variant-btn" onclick="cycleVariant()" disabled>🔄 variant</button>
 
-    <!-- 지우개 두 버튼 -->
+    <!-- 연속 배치 on/off -->
+    <button id="btn-continuous" class="continuous-btn" onclick="toggleContinuousPlacement()">🔁 연속 배치: ON</button>
+
+    <!-- 전체 초기화 -->
     <div id="eraser-buttons">
-      <button class="eraser-btn" onclick="selectEraser()">오브젝트 삭제</button>
       <button class="eraser-btn eraser-clear-btn" onclick="clearMap()">전체 초기화</button>
     </div>
 
@@ -234,6 +236,7 @@
       <button id="btn-mode-build"  class="mode-btn mode-active" onclick="setEditMode('build')">🔨<span class="btn-label"> 제작</span></button>
       <button id="btn-mode-select" class="mode-btn"             onclick="setEditMode('select')">👆<span class="btn-label"> 선택</span></button>
       <button id="btn-mode-move"   class="mode-btn"             onclick="setEditMode('move')">✋<span class="btn-label"> 이동</span></button>
+      <button id="btn-mode-erase"  class="mode-btn"             onclick="selectEraser()">🧹<span class="btn-label"> 지우개</span></button>
     </div>
     <div id="action-divider"></div>
     <button id="btn-overwrite" onclick="overwriteCity()" style="display:none">💾<span class="btn-label"> 덮어쓰기</span></button>
